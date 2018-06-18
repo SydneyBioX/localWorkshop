@@ -201,7 +201,7 @@ Before doing any classification, the number of genes will be reduced to make fea
 geneVariances <- apply(measurementsVS, 1, var)
 mostVariable <- order(geneVariances, decreasing = TRUE)[1:2000]
 measurementsVS <- measurementsVS[mostVariable, ]
-head(measurementsVS)
+measurementsVS[1:6, 1:6]
 ```
 
 Class information is not used, so the filtering is fair.
