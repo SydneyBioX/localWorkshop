@@ -1,0 +1,213 @@
+---
+output:
+  xaringan::moon_reader:
+    css: ["default", "styling/sydney-fonts.css", "styling/sydney.css"]
+    self_contained: false
+    seal: true
+    nature:
+      beforeInit: ["styling/remark-zoom.js"]
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: '16:9'
+      navigation:
+        scroll: false
+---
+
+class: title-slide
+background-image: url("styling/USydLogo-black.svg"), url("styling/title-image1.jpg")
+background-position: 10% 90%, 100% 50%
+background-size: 160px, 100% 100%
+
+.content-box-purple[
+# .black[Activity 1]
+## Identifying Biomarkers and Making Predictions of Treatment Resistance
+### Ellis Patrick
+### 29 June 2018
+]
+
+---
+
+## Activity Overview
+
+- RNA-seq Data Set: Acute Myeloid Leukaemia Treatment Resistance
+
+--
+
+- ClassifyR: Biomarker Selection Methods and Cross-validation
+
+--
+
+- Differential Means and Differential Distribution Classifiers for Classifying AML Patients
+
+---
+
+## RNA-seq Data Set: Acute Myeloid Leukaemia (AML) Treatment Resistance
+
+- Primary therapy resistance is a major problem in acute myeloid leukemia treatment. Approximately 20–30% of younger adult patients with AML and as many as 50% of older adults are refractory to induction treatment.
+
+--
+
+- Research findings are <a href="http://www.haematologica.org/content/103/3/456" target="_blank">published</a> in *Haematologica* in 2018.
+
+--
+
+- The data is available from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106291" target="_blank">GEO Browser</a> as 250 `txt.gz` files or a Microsoft Excel file where the gene expression values were standardised to have a mean of 0 and variance of 1.
+
+--
+
+```{r, echo = FALSE}
+library(knitr)
+opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
+```
+
+Import the prepared tab-separated text files of RNA-seq read counts and clinical data.
+
+```{r}
+readCounts <- read.delim("data/counts.txt", check.names = FALSE)
+readCounts <- as.matrix(readCounts)
+sampleInfo <- read.delim("data/samples.txt", check.names = FALSE)
+```
+
+---
+
+## Clinical Data
+
+The cinical data provides information about seven different characteristics of the patients.
+
+```{r}
+# Add scroll box.
+head(sampleInfo)
+nrow(sampleInfo)
+```
+
+Observe the number of samples which are resistant to treatment and which are not.
+
+```{r}
+table(sampleInfo[, "Response"])
+```
+
+$164 + 71 = 235$, so there are 15 patients with missing data regarding their resistance. Identify which rows of the clinical data they are in.
+
+```{r}
+removeClinical <- which(is.na(sampleInfo[, "Response"]))
+```
+
+---
+
+## AML Read Counts
+
+```{r}
+dim(readCounts)
+```
+
+There are `r nrow(readCounts)` genes in the counts table and `r ncol(readCounts)` AML patients.
+
+--
+
+```{r}
+readCounts[1:6, 1:6]
+```
+
+---
+
+## AML Read Counts
+
+The number of reads per sample varies widely betwen patients by as much as 10-fold.
+
+```{r}
+samplesCounts <- colSums(readCounts)
+countsSummary <- summary(samplesCounts)
+countsSummary
+```
+
+--
+
+Identify in which columns of the matrix patients with less than the first quartile of counted reads and more than the third quartile are to remove them from the analysis.
+
+```{r}
+removeRNA <- which(samplesCounts < countsSummary["1st Qu."] |
+                   samplesCounts > countsSummary["3rd Qu."])
+```
+
+---
+
+## Subsetting the Data Set
+
+Remove samples which have a number of read counts below the first quartile of counted reads or above the third quartile as well as those missing resistance status.
+
+```{r}
+allRemove <- union(removeClinical, removeRNA)
+readCounts <- readCounts[, -allRemove]
+sampleInfo <- sampleInfo[-allRemove, ]
+```
+
+--
+
+Caclulate the number of remanining samples belonging to each class.
+
+```{r}
+classes <- sampleInfo[, "Response"]
+table(classes)
+```
+
+--
+
+There is a moderate amount of class imbalance in this data set.
+
+---
+
+## Relationship of Mean and Variance
+
+- RNA-seq count measurements are known to have a relationship between mean and variance.
+
+- Many classification algorithms require data with constant variance over the range of means.
+
+Observe the mean-variance relationship after scaling counts for different total counts per sample.
+
+```{r, message = FALSE}
+library(EDASeq)
+AMLExpressionSet <- newSeqExpressionSet(readCounts)
+AMLExpressionSet <- betweenLaneNormalization(AMLExpressionSet)
+#meanVarPlot(AMLExpressionSet, log = TRUE, ylim = c(0, 20),
+ #           main = "Mean-Variance Plot") bug; doesn't work on normalised counts!
+```
+
+---
+
+Using DESeq2's `varianceStabilizingTransformation` function, remove the relationship of variance to mean.
+
+```{r}
+library(DESeq2)
+measurementsVS <- varianceStabilizingTransformation(readCounts)
+```
+
+--
+
+Visualise again the relationship between mean and variance.
+
+```{r}
+meanVarPlot(newSeqExpressionSet(measurementsVS), log = TRUE,
+            xlim = c(1, 3), ylim = c(0, 3), main = "Mean-Variance Plot")
+```
+
+The variance is now constant across the range of means.
+
+## Subsetting the Data Set Again
+
+Before doing any classification, the number of genes will be reduced to make feature selection faster. The top 2000 most variable genes are retained.
+
+```{r}
+geneVariances <- apply(measurementsVS, 1, var)
+mostVariable <- order(geneVariances, decreasing = TRUE)[1:2000]
+measurementsVS <- measurementsVS[mostVariable, ]
+head(measurementsVS)
+```
+
+Class information is not used, so the filtering is fair.
+
+---
+
+## ClassifyR
+
+Introduce it.

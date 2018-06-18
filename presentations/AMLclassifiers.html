@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title></title>
+    <meta charset="utf-8">
+    <link href="AMLclassifiers_files/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link rel="stylesheet" href="styling/sydney-fonts.css" type="text/css" />
+    <link rel="stylesheet" href="styling/sydney.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+
+
+class: title-slide
+background-image: url("styling/USydLogo-black.svg"), url("styling/title-image1.jpg")
+background-position: 10% 90%, 100% 50%
+background-size: 160px, 100% 100%
+
+.content-box-purple[
+# .black[Activity 1]
+## Identifying Biomarkers and Making Predictions of Treatment Resistance
+### Ellis Patrick
+### 29 June 2018
+]
+
+---
+
+## Activity Overview
+
+- RNA-seq Data Set: Acute Myeloid Leukaemia Treatment Resistance
+
+--
+
+- ClassifyR: Biomarker Selection Methods and Cross-validation
+
+--
+
+- Differential Means and Differential Distribution Classifiers for Classifying AML Patients
+
+---
+
+## RNA-seq Data Set: Acute Myeloid Leukaemia (AML) Treatment Resistance
+
+- Primary therapy resistance is a major problem in acute myeloid leukemia treatment. Approximately 20–30% of younger adult patients with AML and as many as 50% of older adults are refractory to induction treatment.
+
+--
+
+- Research findings are &lt;a href="http://www.haematologica.org/content/103/3/456" target="_blank"&gt;published&lt;/a&gt; in *Haematologica* in 2018.
+
+--
+
+- The data is available from &lt;a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106291" target="_blank"&gt;GEO Browser&lt;/a&gt; as 250 `txt.gz` files or a Microsoft Excel file where the gene expression values were standardised to have a mean of 0 and variance of 1.
+
+--
+
+
+
+Import the prepared tab-separated text files of RNA-seq read counts and clinical data.
+
+
+```r
+readCounts &lt;- read.delim("data/counts.txt", check.names = FALSE)
+readCounts &lt;- as.matrix(readCounts)
+sampleInfo &lt;- read.delim("data/samples.txt", check.names = FALSE)
+```
+
+---
+
+## Clinical Data
+
+The cinical data provides information about seven different characteristics of the patients.
+
+
+```r
+# Add scroll box.
+head(sampleInfo)
+```
+
+```
+##       ID Gender Age  Response Survivial Time Status RUNX1-RUNX1T1 Fusion
+## 1 GEO-13   Male  47 Resistant             32   Dead                   No
+## 2 GEO-14   Male  38 Resistant            125   Dead                   No
+## 3 GEO-15 Female  38 Resistant              1   Dead                   No
+## 4 GEO-16   Male  37 Resistant             18   Dead                   No
+## 5 GEO-17   Male  33 Resistant            143   Dead                   No
+## 6 GEO-18   Male   7 Resistant            127  Alive                   No
+##   RUNX1 Mutation
+## 1            Yes
+## 2            Yes
+## 3            Yes
+## 4            Yes
+## 5             No
+## 6            Yes
+```
+
+```r
+nrow(sampleInfo)
+```
+
+```
+## [1] 250
+```
+
+Observe the number of samples which are resistant to treatment and which are not.
+
+
+```r
+table(sampleInfo[, "Response"])
+```
+
+```
+## 
+## Resistant Sensitive 
+##        71       164
+```
+
+`\(164 + 71 = 235\)`, so there are 15 patients with missing data regarding their resistance. Identify which rows of the clinical data they are in.
+
+
+```r
+removeClinical &lt;- which(is.na(sampleInfo[, "Response"]))
+```
+
+---
+
+## AML Read Counts
+
+
+```r
+dim(readCounts)
+```
+
+```
+## [1] 23367   250
+```
+
+There are 23367 genes in the counts table and 250 AML patients.
+
+--
+
+
+```r
+readCounts[1:6, 1:6]
+```
+
+```
+##          GEO-13 GEO-14 GEO-15 GEO-16 GEO-17 GEO-18
+## A1BG        270     84     22    245    380    581
+## A1BG-AS1     32     59      7     60    126     88
+## A1CF          0      0      0      0      0      0
+## A2LD1        14      4     18     19     35      1
+## A2M          38      8     58    185      0     20
+## A2ML1         0      0      1      0      0      0
+```
+
+---
+
+## AML Read Counts
+
+The number of reads per sample varies widely betwen patients by as much as 10-fold.
+
+
+```r
+samplesCounts &lt;- colSums(readCounts)
+countsSummary &lt;- summary(samplesCounts)
+countsSummary
+```
+
+```
+##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+##  3427284  9198530 10865612 12365192 13335215 41850915
+```
+
+--
+
+Identify in which columns of the matrix patients with less than the first quartile of counted reads and more than the third quartile are to remove them from the analysis.
+
+
+```r
+removeRNA &lt;- which(samplesCounts &lt; countsSummary["1st Qu."] |
+                   samplesCounts &gt; countsSummary["3rd Qu."])
+```
+
+---
+
+## Subsetting the Data Set
+
+Remove samples which have a number of read counts below the first quartile of counted reads or above the third quartile as well as those missing resistance status.
+
+
+```r
+allRemove &lt;- union(removeClinical, removeRNA)
+readCounts &lt;- readCounts[, -allRemove]
+sampleInfo &lt;- sampleInfo[-allRemove, ]
+```
+
+--
+
+Caclulate the number of remanining samples belonging to each class.
+
+
+```r
+classes &lt;- sampleInfo[, "Response"]
+table(classes)
+```
+
+```
+## classes
+## Resistant Sensitive 
+##        40        73
+```
+
+--
+
+There is a moderate amount of class imbalance in this data set.
+
+---
+
+## Relationship of Mean and Variance
+
+- RNA-seq count measurements are known to have a relationship between mean and variance.
+
+- Many classification algorithms require data with constant variance over the range of means.
+
+Observe the mean-variance relationship after scaling counts for different total counts per sample.
+
+
+```r
+library(EDASeq)
+AMLExpressionSet &lt;- newSeqExpressionSet(readCounts)
+AMLExpressionSet &lt;- betweenLaneNormalization(AMLExpressionSet)
+#meanVarPlot(AMLExpressionSet, log = TRUE, ylim = c(0, 20),
+ #           main = "Mean-Variance Plot") bug; doesn't work on normalised counts!
+```
+
+---
+
+Using DESeq2's `varianceStabilizingTransformation` function, remove the relationship of variance to mean.
+
+
+```r
+library(DESeq2)
+measurementsVS &lt;- varianceStabilizingTransformation(readCounts)
+```
+
+--
+
+Visualise again the relationship between mean and variance.
+
+
+```r
+meanVarPlot(newSeqExpressionSet(measurementsVS), log = TRUE,
+            xlim = c(1, 3), ylim = c(0, 3), main = "Mean-Variance Plot")
+```
+
+```
+## Warning in validityMethod(object): 'counts' contains non-integer numbers
+```
+
+![](AMLclassifiers_files/figure-html/unnamed-chunk-14-1.png)&lt;!-- --&gt;
+
+The variance is now constant across the range of means.
+
+## Subsetting the Data Set Again
+
+Before doing any classification, the number of genes will be reduced to make feature selection faster. The top 2000 most variable genes are retained.
+
+
+```r
+geneVariances &lt;- apply(measurementsVS, 1, var)
+mostVariable &lt;- order(geneVariances, decreasing = TRUE)[1:2000]
+measurementsVS &lt;- measurementsVS[mostVariable, ]
+head(measurementsVS)
+```
+
+```
+##             GEO-13    GEO-14    GEO-15    GEO-16    GEO-19    GEO-23
+## XIST      5.062396  5.178148 13.541422  9.188697  9.618966 11.462734
+## RPS4Y1   12.325286 11.771083  4.549248 12.194969 10.613627 11.691603
+## HLA-DQB1  4.904264  6.236311 12.780571  7.973863 11.617717  8.386216
+## HBG2      5.062396  4.979277  9.263001 12.634407 12.693897 11.105495
+## KDM5D    11.060686 10.000682  3.697632 10.991681  9.804978 10.061677
+## THBS1     8.743274 11.188168 10.928276  9.001494  9.818238 10.756625
+##             GEO-24    GEO-25    GEO-26    GEO-27    GEO-28    GEO-29
+## XIST     15.008118  5.796112  5.388566 12.885432 13.152549 14.557726
+## RPS4Y1    4.389641 11.301697 11.669887  5.379162  3.697632  4.190629
+## HLA-DQB1 12.213012  9.255303 12.414313  8.187421 12.599816 10.199084
+## HBG2     10.612442  5.734917  5.022943 11.338815 12.850391  9.208783
+## KDM5D     4.541245 10.401221  9.525991  5.139804  4.458670  3.697632
+## THBS1     9.223347 12.001048 16.957032  9.018145 12.423437  9.238333
+##             GEO-30    GEO-32    GEO-39    GEO-40    GEO-41    GEO-51
+## XIST      5.044486  5.303441  6.356005 13.983774 14.057774 15.093841
+## RPS4Y1   10.962729 11.558504 12.782860  5.319959  3.697632  7.390846
+## HLA-DQB1 12.251251 11.136081 11.833259  5.398943  9.657042 11.599086
+## HBG2      8.588930  8.937025  7.235955  8.884959 15.897615 12.983800
+## KDM5D     9.617170 10.161174 10.680980  4.493221  3.697632  5.855264
+## THBS1    16.929532 10.822024 13.246536  9.372990  9.072206 10.356332
+##             GEO-52    GEO-53    GEO-54    GEO-59    GEO-61    GEO-63
+## XIST     15.404066 11.497011 10.779012  5.536439 14.478807 13.097488
+## RPS4Y1    4.609305 12.239196 11.314001 11.759890  5.068992  4.159946
+## HLA-DQB1 10.190942  8.610193  8.784247  9.987734  5.068992  4.159946
+## HBG2      6.609964 10.585077  9.984425  9.424703  9.574283 14.635496
+## KDM5D     4.047119 11.072941  9.599228 10.119760  4.647511  4.159946
+## THBS1    11.821351 10.012989 13.987411  9.853995  9.383796 15.402857
+##             GEO-64    GEO-70    GEO-72    GEO-77    GEO-78    GEO-79
+## XIST     14.978738 14.912811 14.877947  5.589464 13.131113  7.095924
+## RPS4Y1    9.492560  4.792209  4.520039 12.413682  4.064786 10.705934
+## HLA-DQB1  9.706792 10.436693  4.643162 10.611852  3.697632  4.373343
+## HBG2     10.190385  5.673826  6.427614 10.796643 11.081888 10.791792
+## KDM5D     8.622055  4.092736  4.283042 10.882613  4.330199 10.230854
+## THBS1    10.297160 12.915438  9.384185  7.906890 16.269531 13.676300
+##             GEO-81    GEO-84    GEO-85    GEO-90    GEO-91    GEO-93
+## XIST     14.145223 14.327358  5.587041  5.438259 14.356828 16.190070
+## RPS4Y1    4.485865  4.325014 10.477022 11.537981  4.325733  4.610430
+## HLA-DQB1  4.095408  4.142991  9.822486  6.681795  8.961846  4.075446
+## HBG2     15.289574 12.906067  8.868085  8.247435  9.858779  8.233750
+## KDM5D     4.095408  4.142991  9.677369 10.330933  4.421040  4.230437
+## THBS1    12.281353 10.154793 16.478300  7.025316  7.226353  5.968981
+##             GEO-94    GEO-96    GEO-98    GEO-99   GEO-101   GEO-104
+## XIST      6.377091 14.004541 12.471873  5.931494 15.060494  4.964235
+## RPS4Y1   12.588131  4.411391  4.210549 11.995600  4.187479 11.112654
+## HLA-DQB1 11.647779  4.282365  3.697632  4.411649  4.296155  9.142202
+## HBG2      9.231742 13.294694 16.766778  6.916231  5.748960 11.275368
+## KDM5D    11.323122  4.697250  3.697632 10.410522  4.187479 10.183889
+## THBS1     7.207028 16.457812  9.795079 10.485337  5.346600  9.666109
+##            GEO-107   GEO-108   GEO-110   GEO-111   GEO-112   GEO-113
+## XIST      5.724416  7.592172 15.215300 14.726501  9.065114 15.532497
+## RPS4Y1   10.297190 11.798176  5.761641  6.591542 11.336450  6.001829
+## HLA-DQB1  4.333581 12.236857  6.186708  5.088661 11.701270  4.677387
+## HBG2      8.066579  7.014501 12.049377 14.469842  7.782578  7.254080
+## KDM5D     9.703012 10.100465  5.901457  4.742264  9.873098  4.623249
+## THBS1    10.156088  7.959240 11.051753 15.050735 13.100330  7.522968
+##            GEO-118   GEO-120   GEO-122   GEO-123   GEO-125   GEO-126
+## XIST     13.761838 14.782870  6.916506  5.958027  6.861492  6.723528
+## RPS4Y1    4.833717  4.647561 11.672924 12.006262 12.630175 11.583168
+## HLA-DQB1 13.114716  4.325827  5.441763  4.086698 12.595021  4.645779
+## HBG2      4.898997 10.344714  5.228879  8.395907  7.660179  7.240069
+## KDM5D     3.697632  4.211886 11.043124 10.093902 10.035147 10.013448
+## THBS1    10.540207 11.836501  9.342416 11.956471 12.270119  4.936217
+##            GEO-131   GEO-137   GEO-138   GEO-141   GEO-145   GEO-148
+## XIST     14.150743 14.208828 15.191568 14.766875  8.020089  8.070545
+## RPS4Y1    6.450489  4.753049  4.452485  4.338235 11.218254 11.758522
+## HLA-DQB1 11.176978  4.452053 10.385451  8.431788 10.544314  7.651853
+## HBG2     11.783015  9.257019 10.857567 16.050882 12.513206 11.946803
+## KDM5D     5.343314  4.352804  4.078273  4.435365 10.268573 10.815964
+## THBS1    11.622975 13.672520  9.090831  8.391332 12.456965 11.016221
+##            GEO-149   GEO-152   GEO-154   GEO-156   GEO-157   GEO-158
+## XIST     14.336529 13.564152 14.887173 15.315660  6.885841 14.177554
+## RPS4Y1    6.854486  4.232105  4.090209  4.634964 11.718319  3.697632
+## HLA-DQB1 10.005966  4.232105  9.436105  4.085889  4.606830  8.427636
+## HBG2     11.532014  8.246414 15.202017  9.645577 10.387146  7.996153
+## KDM5D     5.948130  4.076636  3.697632  4.245079 10.455505  4.199563
+## THBS1     9.696162 10.137422 11.866899  5.614223  8.731305  8.793072
+##            GEO-159   GEO-160   GEO-161   GEO-163   GEO-165   GEO-166
+## XIST     15.769543  4.398139 15.285421  7.048104  6.526023 15.461430
+## RPS4Y1    4.606596 12.089074  4.592784  9.388107 12.011879  4.100758
+## HLA-DQB1  4.278142  8.720179  8.969773  4.058409  8.541900  8.742555
+## HBG2      8.139161  6.068555 13.249310 12.327749  5.278603  9.912685
+## KDM5D     3.697632  4.596293  4.827989  8.655231  9.867986  4.391436
+## THBS1     9.230164  6.262832 11.011009 12.953429  7.228312 12.153960
+##            GEO-167   GEO-168   GEO-169   GEO-171   GEO-172   GEO-175
+## XIST      7.271035 13.994382  6.824008  6.736227 14.988337  6.871333
+## RPS4Y1   11.886092  4.106169 11.742370 11.047782  4.296521 10.198487
+## HLA-DQB1  4.443978  8.603493 10.922695  7.859080  4.296521  4.523243
+## HBG2      6.443563 13.392083 11.350449 10.329889  9.459193 11.698814
+## KDM5D    12.084892  4.273492 10.097915 11.312708  4.045048 10.571521
+## THBS1    10.308913  9.257902  8.156585  9.804159  8.538250  7.590546
+##            GEO-176   GEO-177   GEO-180   GEO-181   GEO-183   GEO-185
+## XIST     15.716671  6.510059 12.657883 15.062332  9.332520 15.263110
+## RPS4Y1    4.315154 11.225115  3.697632  4.471263  7.411667  4.041640
+## HLA-DQB1  6.081375 12.461930 12.278150  4.147830 10.133896  3.697632
+## HBG2      5.424522 10.687538  9.644488  7.760684 13.801322 10.472485
+## KDM5D     4.408915 11.145771  3.697632  4.973518  7.404491  4.041640
+## THBS1     6.581912 10.315656 15.275654  9.918414 11.177123 12.278977
+##            GEO-188   GEO-189   GEO-192   GEO-193   GEO-194  GEO-198
+## XIST     14.140736 15.138162  9.835982 11.142114  8.914196 10.66957
+## RPS4Y1    4.186714  4.050407 11.242785 11.009442 10.527169 10.25362
+## HLA-DQB1 11.583283  9.882973  9.426673  8.161153 12.741728 10.06378
+## HBG2      9.706814 10.701725  8.514377 10.050022  6.983098 10.26909
+## KDM5D     4.662410  4.195304 10.864143 10.534741 10.850595 10.83525
+## THBS1    12.064776  9.404078 10.002836 10.174389 11.808584 10.53848
+##            GEO-200   GEO-201   GEO-207   GEO-214   GEO-217   GEO-219
+## XIST     15.491117 13.970493 13.462482 13.315119  5.395896  5.229345
+## RPS4Y1    4.549913  4.491235  4.248830  4.067773 10.724378 11.450131
+## HLA-DQB1 11.066700  7.650447 11.499729  9.202128 10.383462  4.140942
+## HBG2      9.724758  7.797462  9.059780  9.015935 10.517337  4.140942
+## KDM5D     4.462094  3.697632  4.088565  4.067773  9.921266  9.641497
+## THBS1     8.423584 13.094245 14.201160 15.882757 12.959281 14.401018
+##            GEO-220   GEO-224   GEO-226   GEO-229   GEO-231   GEO-233
+## XIST      5.399951 14.241282 13.243643  6.722863  5.109025 13.565006
+## RPS4Y1   11.288584  4.688345  4.459564 11.099734 11.251467  4.292454
+## HLA-DQB1  4.089828 12.532919 12.640847  4.173726  4.681530  3.697632
+## HBG2      9.838091  5.510542  5.229269  5.588445 13.489959 11.366840
+## KDM5D    10.353163  4.277024  4.322116  9.891361  9.158188  4.119713
+## THBS1    11.762795 15.757265 16.444933 17.060479 16.035190  8.987812
+##            GEO-234   GEO-235   GEO-237   GEO-238   GEO-239   GEO-240
+## XIST     13.585215  5.253158  6.416658  5.532548 14.162264 13.699085
+## RPS4Y1    4.240828 12.524684 12.420246  7.793015  4.345771  4.607629
+## HLA-DQB1 12.253999  3.697632  9.199652  4.134480 10.744832  4.488888
+## HBG2     13.716979  7.365140  8.000116 15.364634  9.218099 17.035067
+## KDM5D     4.360986 10.472135 10.195363  5.035857  4.606846  4.607629
+## THBS1     9.944294  9.068133 13.641706  7.314253 10.784582 15.233349
+##            GEO-242   GEO-249   GEO-252   GEO-254   GEO-257
+## XIST      5.964538 14.797338  5.193308  5.099949 13.504423
+## RPS4Y1   11.645213  5.040289 11.834356 11.418102  4.519509
+## HLA-DQB1  4.146168 12.003680  4.470151 12.491828  9.778014
+## HBG2      6.109033 18.772661 12.944123  9.338368  8.420766
+## KDM5D    11.349166  4.187297  9.637746  9.954265  4.371656
+## THBS1    16.077415  9.241168  7.294210 17.209153 13.621621
+```
+
+Class information is not used, so the filtering is fair.
+
+---
+
+## ClassifyR
+
+Introduce it.
+    </textarea>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script src="styling/remark-zoom.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9",
+"navigation": {
+"scroll": false
+}
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function() {
+  var d = document, s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})();</script>
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  tex2jax: {
+    skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+  }
+});
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
