@@ -21,7 +21,7 @@ background-size: 160px, 100% 100%
 
 .content-box-purple[
 # .black[Activity 1]
-## Identifying Biomarkers and Making Predictions of Treatment Resistance
+## Selecting Biomarkers and Making Predictions of Treatment Resistance
 ### Ellis Patrick
 ### 29 June 2018
 ]
@@ -52,7 +52,7 @@ background-size: 160px, 100% 100%
 
 --
 
-- The data is available from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106291" target="_blank">GEO Browser</a> as 250 `txt.gz` files or a Microsoft Excel file where the gene expression values were standardised to have a mean of 0 and variance of 1.
+- The data is available from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106291" target="_blank">GEO Browser</a> as 250 `txt.gz` files of gene-level read counts or a Microsoft Excel file where the gene expression values were standardised to have a mean of 0 and variance of 1.
 
 --
 
@@ -76,7 +76,6 @@ sampleInfo <- read.delim("data/samples.txt", check.names = FALSE)
 The cinical data provides information about seven different characteristics of the patients.
 
 ```{r}
-# Add scroll box.
 head(sampleInfo)
 nrow(sampleInfo)
 ```
@@ -180,6 +179,7 @@ Using DESeq2's `varianceStabilizingTransformation` function, remove the relation
 ```{r}
 library(DESeq2)
 measurementsVS <- varianceStabilizingTransformation(readCounts)
+normCounts(AMLExpressionSet) <- measurementsVS
 ```
 
 --
@@ -187,11 +187,13 @@ measurementsVS <- varianceStabilizingTransformation(readCounts)
 Visualise again the relationship between mean and variance.
 
 ```{r}
-meanVarPlot(newSeqExpressionSet(measurementsVS), log = TRUE,
-            xlim = c(1, 3), ylim = c(0, 3), main = "Mean-Variance Plot")
+#meanVarPlot(AMLExpressionSet, xlim = c(1, 3), ylim = c(0, 3),
+#            main = "Mean-Variance Plot")
 ```
 
 The variance is now constant across the range of means.
+
+---
 
 ## Subsetting the Data Set Again
 
@@ -204,10 +206,186 @@ measurementsVS <- measurementsVS[mostVariable, ]
 measurementsVS[1:6, 1:6]
 ```
 
-Class information is not used, so the filtering is fair.
+Class information is not used, so the filtering is fair. The most variable gene is XIST, a gene involved with X chromosome inactivation, a process by which one of the two copies of the X chromosome present in female mammals is inactivated.
 
 ---
 
 ## ClassifyR
 
-Introduce it.
+- A *framework* for feature selection, cross-validated classification and its performance evaluation.
+
+--
+
+- Some popular feature selection methods and classifiers implemented in the package.
+--
+
+- Runs cross-validation in parallel on Windows, MacOS, Linux operating systems.
+
+--
+
+- Supports numeric-only (`matrix`) data, mixed numeric-categorical (`DataFrame`) data and multi-omics data (`MultiAssayExperiment`). 
+
+--
+
+- Continually maintained and supported (first released in 2014).
+
+---
+
+## Parameter Objects
+
+- Each stage of classification is defined by a parameter object.
+
+--
+
+- The four main types of objects are `TransformParams`, `SelectParams`, `TrainParams` and `PredictParams`.
+
+--
+
+- `TransformParams` and `SelectParams` are optional.
+
+---
+
+## Getting Help Using ClassifyR
+
+- Every Bioconductor package has a vignette which demonstrates the main usage on an example data set. ClassifyR's HTML vignette is available from the <a href="https://bioconductor.org/packages/release/bioc/html/ClassifyR.html" target="_blank">package's home page</a>.
+
+- The <a href="https://support.bioconductor.org/" target="_blank">Bioconductor Support Forum</a> is the best communication channel to ask questions about packages.
+
+---
+
+## Cross-validation
+
+- The process of creating many different training and test sets is handled by `runTests`.
+
+--
+
+- The `seed` option allows the specification of a number which results in cross-validations which rely on random splits to be reproduced if the code is rerun, even if it runs on multiple cores.
+
+--
+
+- The result of running `runTests` is a `ClassifyResult` object, which many performance evaluation functions use.
+
+--
+
+- A `ClassifyResult` object stores the class predictions and possibly also class scores as well as the features selected at each cross-validation iteration.
+
+---
+
+## Differential Means Classifier for AML Resistance
+
+- The default feature selection method of `SelectParams` is a moderated t-test based ranking and selection of the top $p$ genes that give the best resubstitution error (considering 10, 20, ..., 100 top-ranked features). See `?SelectParams` for the specification.
+
+--
+
+- The default training and prediction methods for `TrainParams` and `PredictParams` are for Diagonal Linear Discriminant Analysis (DLDA). See `?TrainParams` and `?PredictParams` for the specification.
+
+---
+
+## Differential Means (DM) Classifier for AML Resistance
+
+Run 20 permutations and 5 folds cross-validation.
+
+--
+
+```{r, message = FALSE}
+library(ClassifyR)
+```
+
+```{r}
+classifiedDM <- runTests(measurementsVS, classes, "AML", "DLDA",
+                         permutations = 20, seed = 2018)
+classifiedDM
+```
+
+---
+
+## Parallel Processing
+
+- By default, 2 less cores than the computer has are used.
+
+- On Windows, use `parallelParams = SnowParam(workers = 8)` to use 8 cores and on Linux or MacOS use `parallelParams = MulticoreParam(workers = 8)` as an arguent to `runTests` to achieve the same customisation.
+
+---
+
+## Accessing the Chosen Features
+
+- Rarely done directly by you.
+- The `features` accessor extracts all of the feature selections at each iteration of cross-validation.
+
+```{r}
+# Permutation 1, folds 1 and 2.
+features(classifiedDM)[[1]][1:2]
+```
+
+---
+
+## Accessing the Predictions
+
+- The `predictions` accessor gets all of the class predictions.
+
+```{r}
+# Permutation 1
+head(predictions(classifiedDM)[[1]])
+```
+
+---
+
+## Most Frequently Selected Feature
+
+The `distribution` function calculates the feature selection frequency of all features.
+
+```{r}
+frequencies <- distribution(classifiedDM, plot = FALSE)
+frequencies <- sort(frequencies, decreasing = TRUE)
+head(frequencies)
+```
+
+BEND4 is chosen in all 100 cross-validations.
+
+---
+
+## Most Frequently Selected Feature
+
+The distribution of gene expression per class can be quickly visualised with `plotFeatureClasses`.
+
+```{r, fig.height = 4, fig.width = 7, fig.align = "center"}
+plotFeatureClasses(measurementsVS, classes, targets = "BEND4",
+                   whichNumericPlots = "density", xAxisLabel = "RNA-seq Abundance")
+```
+
+The gene is visibly differentially expressed between resistant and sensitive patients.
+
+---
+
+## Clinical Data Quality Check
+
+ZFY is a gene on the Y chromosome which only males have. Plot its expression with the gender in place of the treatment resistance classes.
+
+```{r, fig.height = 4, fig.width = 7, fig.align = "center"}
+plotFeatureClasses(measurementsVS, sampleInfo[, "Gender"], targets = "ZFY",
+                   whichNumericPlots = "density", xAxisLabel = "RNA-seq Abundance")
+```
+
+The abundance grouped by gender is as expected.
+
+---
+
+## Differential Distribution (DD) Classifier for AML Resistance
+
+- Both changes in means and changes in variances can be useful for making class predictions.
+
+--
+
+- DD
+
+---
+
+## After the Break
+
+- Evaluation of the feature selection stability.
+
+- Evaluation of overall error, sample-specific error, precision, recall.
+
+- Comparison of DE-based and DD-based classifiers.
+
+
