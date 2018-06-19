@@ -499,9 +499,73 @@ The abundance grouped by gender is as expected.
 
 - Both changes in means and changes in variances can be useful for making class predictions.
 
+.center[![](images/diffDist.svg)]
+
+---
+
+## DD Feature Selection Setup
+
+Numerous DD selection methods are available in ClassifyR. &lt;a href="https://bioconductor.org/packages/release/bioc/vignettes/ClassifyR/inst/doc/ClassifyR.html#provided-feature-selection-and-classification-methods" target="_blank"&gt;Section 0.9 of the vignette&lt;/a&gt; gives an overview. For this example, Kullback-Leibler divergence will be used.
+
 --
 
-- DD
+Navigate to the Reference Manual (PDF) of &lt;a href="https://bioconductor.org/packages/release/bioc/html/ClassifyR.html" target="_blank"&gt;ClassifyR&lt;/a&gt; to see the formula.
+
+--
+
+
+```r
+selectParams &lt;- SelectParams(KullbackLeiblerSelection,
+                             resubstituteParams = ResubstituteParams())
+```
+
+By default, the mean is the location and the standard deviation is the scale.
+
+---
+
+## DD Classifier Setup
+
+A variety of DD classifiers are available in ClassifyR. For this example, the naive Bayes method will be used. The difference of the height (scaled by the number of samples in each class) between the kernel densities of the two classes is used by each gene to vote for one class. The class with the most votes is the predicted class of the patient.
+
+
+```r
+trainParams &lt;- TrainParams(naiveBayesKernel)
+```
+
+--
+
+`naiveBayesKernel` trains a classifier and returns a factor vector of class predictions, so there is no other function used for predictions.
+
+
+```r
+predictParams &lt;- PredictParams(NULL, weighted = "unweighted", weight = "height difference",
+                               getClasses = function(result) result)
+```
+
+---
+
+## DD Cross-validated Classification
+
+As was done for DM classification, 20 permutations and 5 fold cross-validation is done.
+
+
+```r
+classifiedDD &lt;- runTests(measurementsVS, classes, "AML", "naive Bayes Voting",
+*                        params = list(selectParams, trainParams, predictParams),
+                         permutations = 20, seed = 2018)
+classifiedDD
+```
+
+```
+## An object of class 'ClassifyResult'.
+## Data Set Name: AML.
+## Classification Name: naive Bayes Voting.
+## Feature Selection Name: Kullback-Leibler Divergence.
+## Features: List of length 20 of lists of length 5 of feature indices.
+## Validation: 20 Permutations, 5 Folds.
+## Predictions: List of data frames of length 20.
+## Performance Measures: None calculated yet.
+```
 
 ---
 

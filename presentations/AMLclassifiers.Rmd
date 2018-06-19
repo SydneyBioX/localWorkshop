@@ -374,9 +374,58 @@ The abundance grouped by gender is as expected.
 
 - Both changes in means and changes in variances can be useful for making class predictions.
 
+.center[![](images/diffDist.svg)]
+
+---
+
+## DD Feature Selection Setup
+
+Numerous DD selection methods are available in ClassifyR. <a href="https://bioconductor.org/packages/release/bioc/vignettes/ClassifyR/inst/doc/ClassifyR.html#provided-feature-selection-and-classification-methods" target="_blank">Section 0.9 of the vignette</a> gives an overview. For this example, Kullback-Leibler divergence will be used.
+
 --
 
-- DD
+Navigate to the Reference Manual (PDF) of <a href="https://bioconductor.org/packages/release/bioc/html/ClassifyR.html" target="_blank">ClassifyR</a> to see the formula.
+
+--
+
+```{r}
+selectParams <- SelectParams(KullbackLeiblerSelection,
+                             resubstituteParams = ResubstituteParams())
+```
+
+By default, the mean is the location and the standard deviation is the scale.
+
+---
+
+## DD Classifier Setup
+
+A variety of DD classifiers are available in ClassifyR. For this example, the naive Bayes method will be used. The difference of the height (scaled by the number of samples in each class) between the kernel densities of the two classes is used by each gene to vote for one class. The class with the most votes is the predicted class of the patient.
+
+```{r}
+trainParams <- TrainParams(naiveBayesKernel)
+```
+
+--
+
+`naiveBayesKernel` trains a classifier and returns a factor vector of class predictions, so there is no other function used for predictions.
+
+```{r}
+predictParams <- PredictParams(NULL, weighted = "unweighted", weight = "height difference",
+                               getClasses = function(result) result)
+```
+
+---
+
+## DD Cross-validated Classification
+
+As was done for DM classification, 20 permutations and 5 fold cross-validation is done.
+
+```{r}
+classifiedDD <- runTests(measurementsVS, classes, "AML", "naive Bayes Voting",
+                         params = list(selectParams, trainParams, predictParams), #<<
+                         permutations = 20, seed = 2018)
+classifiedDD
+```
 
 ---
 
