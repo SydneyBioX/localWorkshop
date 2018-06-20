@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title></title>
+    <meta charset="utf-8">
+    <link href="performanceEvaluate_files/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link rel="stylesheet" href="styling/sydney-fonts.css" type="text/css" />
+    <link rel="stylesheet" href="styling/sydney.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+
+
+class: title-slide
+background-image: url("styling/USydLogo-black.svg"), url("styling/title-image1.jpg")
+background-position: 10% 90%, 100% 50%
+background-size: 160px, 100% 100%
+
+.content-box-purple[
+# .black[Activity 2]
+## Performance Evaluation of Classifications
+### Dario Strbenac
+### 29 June 2018
+]
+
+---
+
+## Activity Overview
+
+- Feature selection stability.
+
+--
+
+- Evaluation of overall error, sample-specific error, precision, recall.
+
+--
+
+- Comparison of DE-based and DD-based classifiers.
+
+---
+
+
+
+---
+
+## Feature Selection Stability
+
+- If the genes being selected are the same ones in most of the cross-validations, then the classifier has good stability.
+
+--
+
+- `selectionPlot` provides a way to compare all pairs of gene selections within a classifier or between classifiers.
+
+--
+
+- Input is a list of `ClassifyResult` objects.
+
+--
+
+-  For 20 permutations and 5 folds, there are `\(^{100}C_2 = 4950\)` overlaps to compute. Like `runTests`, `selectionPlot` may utilise multiple processors.
+
+
+
+---
+
+## Feature Selection Stability
+
+
+```r
+margins &lt;- grid::unit(c(1, 1, 1, 1), "lines")
+withinChoices &lt;- selectionPlot(list(classifiedDM, classifiedDD),
+                               xVariable = "selectionName", xLabel = "Selection Method",
+                               columnVariable = "None",
+                               boxFillColouring = "None", boxLineColouring = "None",
+                               rotate90 = TRUE, margin = margins)
+```
+
+&lt;img src="performanceEvaluate_files/figure-html/unnamed-chunk-3-1.png" style="display: block; margin: auto;" /&gt;
+
+The DD feature selection is more stable than the DE selection used.
+
+## Changing Elements of Saved Plots
+
+- Almost all plots produced by ClassifyR are `ggplot` objects created by ggplot2.
+
+- Such objects can be customised after creation because ggplot2 uses a 'painting-over' graphics model, unlike base R graphics.
+
+
+```r
+withinChoices + ggplot2::ggtitle("Chosen Gene Set Overlaps")
+```
+
+&lt;img src="performanceEvaluate_files/figure-html/unnamed-chunk-4-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+
+## Error / Accuracy of Predictions
+
+- `calcCVperformance` calculates performance metrics for `ClassifyResult` objects. 12 different metrics can be calculated.
+
+--
+
+- Metrics are all applicable to data sets with two *or more* classes.
+
+--
+
+- `calcExternalPerformance` can be used on a pair of factor vectors of the same length.
+
+--
+
+
+```r
+actualClasses &lt;- factor(c("Yes", "Yes", "No", "No", "No"))
+predictedClasses &lt;- factor(c("Yes", "No", "No", "No", "No"))
+calcExternalPerformance(actualClasses, predictedClasses, "error")
+```
+
+```
+## [1] 0.2
+```
+
+```r
+calcExternalPerformance(actualClasses, predictedClasses, "accuracy")
+```
+
+```
+## [1] 0.8
+```
+
+---
+
+## Balanced Error Rate for Resistance Classification
+
+- Class sizes of resistance data set are imbalanced. Errors should be summarised by the balanced error rate.
+
+--
+
+
+```r
+classifiedDM &lt;- calcCVperformance(classifiedDM, "balanced error")
+classifiedDM
+```
+
+```
+## An object of class 'ClassifyResult'.
+## Data Set Name: AML.
+## Classification Name: DLDA.
+## Feature Selection Name: Limma moderated t-test.
+## Features: List of length 20 of lists of length 5 of feature identifiers.
+## Validation: 20 Permutations, 5 Folds.
+## Predictions: List of data frames of length 20.
+## Performance Measures: Balanced Error Rate.
+```
+
+```r
+classifiedDD &lt;- calcCVperformance(classifiedDD, "balanced error")
+```
+
+---
+
+## Distribution of Balanced Error Rate
+
+The set of samples was predicted 20 times. `performancePlot` can be used to plot the distribution of a metric to see its stability.
+
+
+```r
+errorPlot &lt;- performancePlot(list(classifiedDM, classifiedDD),
+                             performanceName = "Balanced Error Rate",
+                             boxFillColouring = "None", boxLineColouring = "None",
+                             columnVariable = "None", title = "DV vs. DD Errors",
+                             rotate90 = TRUE, margin = margins)
+```
+
+![](performanceEvaluate_files/figure-html/unnamed-chunk-7-1.png)&lt;!-- --&gt;
+
+--
+
+The predictions of the naive Bayes classifier are no better than random chance.
+    </textarea>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script src="styling/remark-zoom.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9",
+"navigation": {
+"scroll": false
+}
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function() {
+  var d = document, s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})();</script>
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  tex2jax: {
+    skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+  }
+});
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

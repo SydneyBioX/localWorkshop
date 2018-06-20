@@ -187,8 +187,7 @@ normCounts(AMLExpressionSet) <- measurementsVS
 Visualise again the relationship between mean and variance.
 
 ```{r}
-#meanVarPlot(AMLExpressionSet, xlim = c(1, 3), ylim = c(0, 3),
-#            main = "Mean-Variance Plot")
+#meanVarPlot(AMLExpressionSet, main = "Mean-Variance Plot")
 ```
 
 The variance is now constant across the range of means.
@@ -340,7 +339,7 @@ frequencies <- sort(frequencies, decreasing = TRUE)
 head(frequencies)
 ```
 
-BEND4 is chosen in all 100 cross-validations.
+`r names(frequencies)[1]` is chosen `r frequencies[1]` out of 100 possible times.
 
 ---
 
@@ -349,7 +348,7 @@ BEND4 is chosen in all 100 cross-validations.
 The distribution of gene expression per class can be quickly visualised with `plotFeatureClasses`.
 
 ```{r, fig.height = 4, fig.width = 7, fig.align = "center"}
-plotFeatureClasses(measurementsVS, classes, targets = "BEND4",
+plotFeatureClasses(measurementsVS, classes, targets = names(frequencies)[1],
                    whichNumericPlots = "density", xAxisLabel = "RNA-seq Abundance")
 ```
 
@@ -431,7 +430,7 @@ classifiedDD
 
 ## After the Break
 
-- Evaluation of the feature selection stability.
+- Evaluation of feature selection stability.
 
 - Evaluation of overall error, sample-specific error, precision, recall.
 
