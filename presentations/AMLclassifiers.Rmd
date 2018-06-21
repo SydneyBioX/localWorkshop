@@ -59,7 +59,7 @@ background-size: 160px, 100% 100%
 ```{r, echo = FALSE}
 library(knitr)
 opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
-options(width = 90)
+options(width = 91)
 ```
 
 Import the prepared tab-separated text files of RNA-seq read counts and clinical data.
@@ -212,8 +212,7 @@ normCounts(AMLExpressionSet) <- measurementsVS
 Visualise again the relationship between mean and variance.
 
 ```{r, fig.align = "center", fig.height = 5, fig.width = 5}
-meanVarPlot(AMLExpressionSet, xlim = c(0, 9), ylim = c(0, 9),
-            main = "Mean-Variance Plot")
+meanVarPlot(AMLExpressionSet, xlim = c(3, 9), ylim = c(0, 9), main = "Mean-Variance Plot")
 ```
 
 The variance is now reasonably constant across the range of means.
