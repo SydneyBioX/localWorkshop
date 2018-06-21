@@ -59,6 +59,7 @@ background-size: 160px, 100% 100%
 ```{r, echo = FALSE}
 library(knitr)
 opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
+options(width = 90)
 ```
 
 Import the prepared tab-separated text files of RNA-seq read counts and clinical data.
@@ -75,16 +76,23 @@ sampleInfo <- read.delim("data/samples.txt", check.names = FALSE)
 
 The cinical data provides information about seven different characteristics of the patients.
 
+
 ```{r}
 head(sampleInfo)
 nrow(sampleInfo)
 ```
+
+---
+
+## Clinical Data
 
 Observe the number of samples which are resistant to treatment and which are not.
 
 ```{r}
 table(sampleInfo[, "Response"])
 ```
+
+--
 
 $164 + 71 = 235$, so there are 15 patients with missing data regarding their resistance. Identify which rows of the clinical data they are in.
 
@@ -160,37 +168,55 @@ There is a moderate amount of class imbalance in this data set.
 
 - RNA-seq count measurements are known to have a relationship between mean and variance.
 
+--
+
 - Many classification algorithms require data with constant variance over the range of means.
 
-Observe the mean-variance relationship after scaling counts for different total counts per sample.
+--
 
-```{r, message = FALSE}
-library(EDASeq)
-AMLExpressionSet <- newSeqExpressionSet(readCounts)
-AMLExpressionSet <- betweenLaneNormalization(AMLExpressionSet)
-#meanVarPlot(AMLExpressionSet, log = TRUE, ylim = c(0, 20),
- #           main = "Mean-Variance Plot") bug; doesn't work on normalised counts!
+Scale each sample's counts to be the same as the sample in the first column.
+
+```{r}
+scaleFactors <- colSums(readCounts)[1] / colSums(readCounts)
+scaledCounts <- t(t(readCounts) * scaleFactors)
 ```
 
 ---
 
+## Relationship of Mean and Variance
+
+Observe the mean-variance relationship.
+
+```{r, message = FALSE, warning = FALSE, fig.align = "center", fig.height = 5, fig.width = 5}
+library(EDASeq)
+AMLExpressionSet <- newSeqExpressionSet(scaledCounts)
+meanVarPlot(AMLExpressionSet, log = TRUE, main = "Mean-Variance Plot")
+```
+
+---
+
+## Relationship of Mean and Variance
+
 Using DESeq2's `varianceStabilizingTransformation` function, remove the relationship of variance to mean.
 
-```{r}
+```{r, warning = FALSE}
 library(DESeq2)
 measurementsVS <- varianceStabilizingTransformation(readCounts)
 normCounts(AMLExpressionSet) <- measurementsVS
 ```
 
---
+---
+
+## Relationship of Mean and Variance
 
 Visualise again the relationship between mean and variance.
 
-```{r}
-#meanVarPlot(AMLExpressionSet, main = "Mean-Variance Plot")
+```{r, fig.align = "center", fig.height = 5, fig.width = 5}
+meanVarPlot(AMLExpressionSet, xlim = c(0, 9), ylim = c(0, 9),
+            main = "Mean-Variance Plot")
 ```
 
-The variance is now constant across the range of means.
+The variance is now reasonably constant across the range of means.
 
 ---
 
@@ -369,9 +395,10 @@ The abundance grouped by gender is as expected.
 
 ---
 
+
 ## Differential Distribution (DD) Classifier for AML Resistance
 
-- Both changes in means and changes in variances can be useful for making class predictions.
+Both changes in means and changes in variances can be useful for making class predictions.
 
 .center[![](images/diffDist.svg)]
 
@@ -428,12 +455,61 @@ classifiedDD
 
 ---
 
+## Logsitic Regression Classifier for AML Resistance
+
+- Classifier built using only the routinely collected clinical information.
+
+--
+
+- *Multinomial* logistic regression is not available by default in R, but is available from mnlogit.
+
+--
+
+- `logisticRegressionTrainInterface` is a wrapper around the `mnlogit` fitting function.
+
+--
+
+- `logisticRegressionPredictInterface` is a wrapper around the `predict` function for objects of class `mnlogit`.
+
+---
+
+## Logsitic Regression Classifier for AML Resistance
+
+Specify the training and prediction settings.
+
+```{r}
+trainParams <- TrainParams(logisticRegressionTrainInterface)
+predictParams <- PredictParams(logisticRegressionPredictInterface,
+                               getClasses = function(result) result)
+```
+
+Run 20 permutations and 5 folds cross-validation, ignoring GEO ID, Survival Time and Status.
+
+```{r}
+ignoreColumns <- match(c("ID", "Survival Time", "Status"), colnames(sampleInfo))
+ignoreColumns
+classifiedClinical <- runTests(DataFrame(sampleInfo[, -ignoreColumns]), "Response",
+                               "AML", "Logistic Regression",
+                               params = list(trainParams, predictParams), #<<
+                               permutations = 20, seed = 2018)
+```
+
+---
+
+## Logsitic Regression Classifier for AML Resistance
+
+```{r}
+classifiedClinical
+```
+
+---
+
 ## After the Break
 
 - Evaluation of feature selection stability.
 
 - Evaluation of overall error, sample-specific error, precision, recall.
 
-- Comparison of DE-based and DD-based classifiers.
+- Comparison of the three different classifiers.
 
 

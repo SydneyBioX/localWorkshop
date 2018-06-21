@@ -38,7 +38,7 @@ background-size: 160px, 100% 100%
 
 --
 
-- Comparison of DE-based and DD-based classifiers.
+- Comparison of various classifiers.
 
 ---
 
@@ -74,8 +74,9 @@ library(ClassifyR)
 
 ## Feature Selection Stability
 
-```{r, fig.align = "center", fig.width = 14, fig.height = 4}
-margins <- grid::unit(c(1, 1, 1, 1), "lines")
+```{r, fig.align = "center", fig.width = 14, fig.height = 3}
+library(ggplot2)
+margins <- unit(c(1, 1, 1, 1), "lines")
 withinChoices <- selectionPlot(list(classifiedDM, classifiedDD),
                                xVariable = "selectionName", xLabel = "Selection Method",
                                columnVariable = "None",
@@ -83,7 +84,9 @@ withinChoices <- selectionPlot(list(classifiedDM, classifiedDD),
                                rotate90 = TRUE, margin = margins)
 ```
 
-The DD feature selection is more stable than the DE selection used.
+About a quarter of the features selected are typically the same between cross-validations.
+
+---
 
 ## Changing Elements of Saved Plots
 
@@ -91,8 +94,10 @@ The DD feature selection is more stable than the DE selection used.
 
 - Such objects can be customised after creation because ggplot2 uses a 'painting-over' graphics model, unlike base R graphics.
 
+--
+
 ```{r, fig.align = "center", fig.width = 14, fig.height = 4}
-withinChoices + ggplot2::ggtitle("Chosen Gene Set Overlaps")
+withinChoices + ggtitle("Chosen Genes Overlaps")
 ```
 
 ---
@@ -130,6 +135,7 @@ calcExternalPerformance(actualClasses, predictedClasses, "accuracy")
 classifiedDM <- calcCVperformance(classifiedDM, "balanced error")
 classifiedDM
 classifiedDD <- calcCVperformance(classifiedDD, "balanced error")
+classifiedClinical <- calcCVperformance(classifiedClinical, "balanced error")
 ```
 
 ---
@@ -138,16 +144,57 @@ classifiedDD <- calcCVperformance(classifiedDD, "balanced error")
 
 The set of samples was predicted 20 times. `performancePlot` can be used to plot the distribution of a metric to see its stability.
 
+.font70[
 ```{r, fig.width = 14, fig.height = 4}
-errorPlot <- performancePlot(list(classifiedDM, classifiedDD),
+errorPlot <- performancePlot(list(classifiedDM, classifiedDD, classifiedClinical),
                              performanceName = "Balanced Error Rate",
                              boxFillColouring = "None", boxLineColouring = "None",
-                             columnVariable = "None", title = "DV vs. DD Errors",
-                             rotate90 = TRUE, margin = margins)
+                             columnVariable = "None", title = "Balanced Errors",
+                             xLabel = "Classifier", rotate90 = TRUE, margin = margins,
+                             plot = FALSE)
+errorPlot + geom_hline(yintercept = 0.5, colour = "red")
 ```
+]
+
+---
+
+## Sample-specific Error Rate
+
+Calculate the sample-specific error rates for each patient.
+
+```{r}
+classifiedDM <- calcCVperformance(classifiedDM, "sample error")
+classifiedDD <- calcCVperformance(classifiedDD, "sample error")
+classifiedClinical <- calcCVperformance(classifiedClinical, "sample error")
+classifiedClinical
+```
+
+---
+
+## Sample-specific Error Rate
+
+Plot a heatmap of errors using `samplesMetricMap`.
+
+```{r, fig.width = 14, fig.height = 3.8}
+errorPlot <- samplesMetricMap(list(classifiedDM, classifiedDD, classifiedClinical),
+                              xAxisLabel = "Samples", yAxisLabel = "Classifier",
+                              showXtickLabels = FALSE)
+```
+
+DLDA is the only method which has a similar error profile in the minority and majority class.
+
+---
+
+## Precision, Recall, F1 Score
+
+- Micro and macro versions of these can be similarly calculated to the error rates demonstrated previously.
 
 --
 
-The predictions of the naive Bayes classifier are no better than random chance.
+- Use the macro version because each class makes an equal contribution to the metric, unlike for the micro version.
 
+```{r}
+classifiedDM <- calcCVperformance(classifiedDM, "macro precision")
+performance(classifiedDM)[["Macro Precision"]]
+```
 

@@ -71,25 +71,19 @@ sampleInfo &lt;- read.delim("data/samples.txt", check.names = FALSE)
 The cinical data provides information about seven different characteristics of the patients.
 
 
+
 ```r
 head(sampleInfo)
 ```
 
 ```
-##       ID Gender Age  Response Survivial Time Status RUNX1-RUNX1T1 Fusion
-## 1 GEO-13   Male  47 Resistant             32   Dead                   No
-## 2 GEO-14   Male  38 Resistant            125   Dead                   No
-## 3 GEO-15 Female  38 Resistant              1   Dead                   No
-## 4 GEO-16   Male  37 Resistant             18   Dead                   No
-## 5 GEO-17   Male  33 Resistant            143   Dead                   No
-## 6 GEO-18   Male   7 Resistant            127  Alive                   No
-##   RUNX1 Mutation
-## 1            Yes
-## 2            Yes
-## 3            Yes
-## 4            Yes
-## 5             No
-## 6            Yes
+##       ID Gender Age  Response Survival Time Status RUNX1-RUNX1T1 Fusion RUNX1 Mutation
+## 1 GEO-13   Male  47 Resistant            32   Dead                   No            Yes
+## 2 GEO-14   Male  38 Resistant           125   Dead                   No            Yes
+## 3 GEO-15 Female  38 Resistant             1   Dead                   No            Yes
+## 4 GEO-16   Male  37 Resistant            18   Dead                   No            Yes
+## 5 GEO-17   Male  33 Resistant           143   Dead                   No             No
+## 6 GEO-18   Male   7 Resistant           127  Alive                   No            Yes
 ```
 
 ```r
@@ -99,6 +93,10 @@ nrow(sampleInfo)
 ```
 ## [1] 250
 ```
+
+---
+
+## Clinical Data
 
 Observe the number of samples which are resistant to treatment and which are not.
 
@@ -112,6 +110,8 @@ table(sampleInfo[, "Response"])
 ## Resistant Sensitive 
 ##        71       164
 ```
+
+--
 
 `\(164 + 71 = 235\)`, so there are 15 patients with missing data regarding their resistance. Identify which rows of the clinical data they are in.
 
@@ -219,20 +219,38 @@ There is a moderate amount of class imbalance in this data set.
 
 - RNA-seq count measurements are known to have a relationship between mean and variance.
 
+--
+
 - Many classification algorithms require data with constant variance over the range of means.
 
-Observe the mean-variance relationship after scaling counts for different total counts per sample.
+--
+
+Scale each sample's counts to be the same as the sample in the first column.
+
+
+```r
+scaleFactors &lt;- colSums(readCounts)[1] / colSums(readCounts)
+scaledCounts &lt;- t(t(readCounts) * scaleFactors)
+```
+
+---
+
+## Relationship of Mean and Variance
+
+Observe the mean-variance relationship.
 
 
 ```r
 library(EDASeq)
-AMLExpressionSet &lt;- newSeqExpressionSet(readCounts)
-AMLExpressionSet &lt;- betweenLaneNormalization(AMLExpressionSet)
-#meanVarPlot(AMLExpressionSet, log = TRUE, ylim = c(0, 20),
- #           main = "Mean-Variance Plot") bug; doesn't work on normalised counts!
+AMLExpressionSet &lt;- newSeqExpressionSet(scaledCounts)
+meanVarPlot(AMLExpressionSet, log = TRUE, main = "Mean-Variance Plot")
 ```
 
+&lt;img src="AMLclassifiers_files/figure-html/unnamed-chunk-13-1.png" style="display: block; margin: auto;" /&gt;
+
 ---
+
+## Relationship of Mean and Variance
 
 Using DESeq2's `varianceStabilizingTransformation` function, remove the relationship of variance to mean.
 
@@ -243,17 +261,21 @@ measurementsVS &lt;- varianceStabilizingTransformation(readCounts)
 normCounts(AMLExpressionSet) &lt;- measurementsVS
 ```
 
---
+---
+
+## Relationship of Mean and Variance
 
 Visualise again the relationship between mean and variance.
 
 
 ```r
-#meanVarPlot(AMLExpressionSet, xlim = c(1, 3), ylim = c(0, 3),
-#            main = "Mean-Variance Plot")
+meanVarPlot(AMLExpressionSet, xlim = c(0, 9), ylim = c(0, 9),
+            main = "Mean-Variance Plot")
 ```
 
-The variance is now constant across the range of means.
+&lt;img src="AMLclassifiers_files/figure-html/unnamed-chunk-15-1.png" style="display: block; margin: auto;" /&gt;
+
+The variance is now reasonably constant across the range of means.
 
 ---
 
@@ -377,7 +399,7 @@ classifiedDM
 ## Data Set Name: AML.
 ## Classification Name: DLDA.
 ## Feature Selection Name: Limma moderated t-test.
-## Features: List of length 20 of lists of length 5 of feature indices.
+## Features: List of length 20 of lists of length 5 of feature identifiers.
 ## Validation: 20 Permutations, 5 Folds.
 ## Predictions: List of data frames of length 20.
 ## Performance Measures: None calculated yet.
@@ -406,16 +428,15 @@ features(classifiedDM)[[1]][1:2]
 
 ```
 ## [[1]]
-##  [1] "BEND4"     "INHBA"     "LSP1"      "BAIAP2"    "IL1R1"    
-##  [6] "SLA"       "PLAUR"     "ALDH2"     "ADAMTS10"  "HIST3H2A" 
-## [11] "SCRN1"     "CCNA1"     "SOD2"      "SH3PXD2B"  "SLITRK5"  
-## [16] "ID2"       "LOC728606" "LAMP5"     "PSD3"      "ZNF135"   
-## [21] "HIST2H2BE" "BCL11B"    "CAMK4"     "SH3BP5"    "PBX3"     
-## [26] "HMGA2"     "ZMAT1"     "IRAK2"     "CDK6"      "HIST2H2BF"
+##  [1] "BEND4"     "INHBA"     "LSP1"      "BAIAP2"    "IL1R1"     "SLA"       "PLAUR"    
+##  [8] "ALDH2"     "ADAMTS10"  "HIST3H2A"  "SCRN1"     "CCNA1"     "SOD2"      "SH3PXD2B" 
+## [15] "SLITRK5"   "ID2"       "LOC728606" "LAMP5"     "PSD3"      "ZNF135"    "HIST2H2BE"
+## [22] "BCL11B"    "CAMK4"     "SH3BP5"    "PBX3"      "HMGA2"     "ZMAT1"     "IRAK2"    
+## [29] "CDK6"      "HIST2H2BF"
 ## 
 ## [[2]]
-##  [1] "BEND4"     "SH3BP5"    "LOC728606" "LSP1"      "INHBA"    
-##  [6] "DDIT4L"    "ADORA2B"   "LILRA5"    "CDK6"      "CYYR1"
+##  [1] "BEND4"     "SH3BP5"    "LOC728606" "LSP1"      "INHBA"     "DDIT4L"    "ADORA2B"  
+##  [8] "LILRA5"    "CDK6"      "CYYR1"
 ```
 
 ---
@@ -459,7 +480,7 @@ head(frequencies)
 ##       100        92        83        76        69        64
 ```
 
-BEND4 is chosen in all 100 cross-validations.
+BEND4 is chosen 100 out of 100 possible times.
 
 ---
 
@@ -469,11 +490,11 @@ The distribution of gene expression per class can be quickly visualised with `pl
 
 
 ```r
-plotFeatureClasses(measurementsVS, classes, targets = "BEND4",
+plotFeatureClasses(measurementsVS, classes, targets = names(frequencies)[1],
                    whichNumericPlots = "density", xAxisLabel = "RNA-seq Abundance")
 ```
 
-&lt;img src="AMLclassifiers_files/figure-html/unnamed-chunk-21-1.png" style="display: block; margin: auto;" /&gt;
+&lt;img src="AMLclassifiers_files/figure-html/unnamed-chunk-22-1.png" style="display: block; margin: auto;" /&gt;
 
 The gene is visibly differentially expressed between resistant and sensitive patients.
 
@@ -489,15 +510,16 @@ plotFeatureClasses(measurementsVS, sampleInfo[, "Gender"], targets = "ZFY",
                    whichNumericPlots = "density", xAxisLabel = "RNA-seq Abundance")
 ```
 
-&lt;img src="AMLclassifiers_files/figure-html/unnamed-chunk-22-1.png" style="display: block; margin: auto;" /&gt;
+&lt;img src="AMLclassifiers_files/figure-html/unnamed-chunk-23-1.png" style="display: block; margin: auto;" /&gt;
 
 The abundance grouped by gender is as expected.
 
 ---
 
+
 ## Differential Distribution (DD) Classifier for AML Resistance
 
-- Both changes in means and changes in variances can be useful for making class predictions.
+Both changes in means and changes in variances can be useful for making class predictions.
 
 .center[![](images/diffDist.svg)]
 
@@ -561,7 +583,77 @@ classifiedDD
 ## Data Set Name: AML.
 ## Classification Name: naive Bayes Voting.
 ## Feature Selection Name: Kullback-Leibler Divergence.
-## Features: List of length 20 of lists of length 5 of feature indices.
+## Features: List of length 20 of lists of length 5 of feature identifiers.
+## Validation: 20 Permutations, 5 Folds.
+## Predictions: List of data frames of length 20.
+## Performance Measures: None calculated yet.
+```
+
+---
+
+## Logsitic Regression Classifier for AML Resistance
+
+- Classifier built using only the routinely collected clinical information.
+
+--
+
+- *Multinomial* logistic regression is not available by default in R, but is available from mnlogit.
+
+--
+
+- `logisticRegressionTrainInterface` is a wrapper around the `mnlogit` fitting function.
+
+--
+
+- `logisticRegressionPredictInterface` is a wrapper around the `predict` function for objects of class `mnlogit`.
+
+---
+
+## Logsitic Regression Classifier for AML Resistance
+
+Specify the training and prediction settings.
+
+
+```r
+trainParams &lt;- TrainParams(logisticRegressionTrainInterface)
+predictParams &lt;- PredictParams(logisticRegressionPredictInterface,
+                               getClasses = function(result) result)
+```
+
+Run 20 permutations and 5 folds cross-validation, ignoring GEO ID, Survival Time and Status.
+
+
+```r
+ignoreColumns &lt;- match(c("ID", "Survival Time", "Status"), colnames(sampleInfo))
+ignoreColumns
+```
+
+```
+## [1] 1 5 6
+```
+
+```r
+classifiedClinical &lt;- runTests(DataFrame(sampleInfo[, -ignoreColumns]), "Response",
+                               "AML", "Logistic Regression",
+*                              params = list(trainParams, predictParams),
+                               permutations = 20, seed = 2018)
+```
+
+---
+
+## Logsitic Regression Classifier for AML Resistance
+
+
+```r
+classifiedClinical
+```
+
+```
+## An object of class 'ClassifyResult'.
+## Data Set Name: AML.
+## Classification Name: Logistic Regression.
+## Feature Selection Name: Unspecified.
+## Features: All used.
 ## Validation: 20 Permutations, 5 Folds.
 ## Predictions: List of data frames of length 20.
 ## Performance Measures: None calculated yet.
@@ -571,11 +663,11 @@ classifiedDD
 
 ## After the Break
 
-- Evaluation of the feature selection stability.
+- Evaluation of feature selection stability.
 
 - Evaluation of overall error, sample-specific error, precision, recall.
 
-- Comparison of DE-based and DD-based classifiers.
+- Comparison of the three different classifiers.
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
 <script src="styling/remark-zoom.js"></script>
