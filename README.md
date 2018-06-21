@@ -2,7 +2,7 @@
 
 This repsitory contains presenter slides and data files used for the presentation at Charles Perkins Centre on 29 June 2018.
 
-To install Bioconductor software, BiocInstaller must firstly be obtained from CRAN.
+To install Bioconductor software, BiocManager must firstly be obtained from CRAN.
 
 ```
 install.packages("BiocManager")
