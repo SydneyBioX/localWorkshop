@@ -1,0 +1,158 @@
+---
+title: "Performance Evaluation of Classifications"
+author: "Dario Strbenac"
+date: "29 June 2018"
+output:
+  html_document:
+    code_folding: hide
+    number_sections: yes
+    self_contained: yes
+    toc: true
+    toc_float: true
+    toc_depth: 1
+    theme: yeti
+---
+
+```{r, echo = FALSE}
+library(knitr)
+opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
+```
+
+# Activity Overview
+
+- Feature selection stability.
+
+- Evaluation of overall error, sample-specific error, precision, recall.
+
+- Comparison of various classifiers.
+
+# Feature Selection Stability
+
+- If the genes being selected are the same ones in most of the cross-validations, then the classifier has good stability.
+
+- `selectionPlot` provides a way to compare all pairs of gene selections within a classifier or between classifiers.
+
+- Input is a list of `ClassifyResult` objects.
+
+-  For 20 permutations and 5 folds, there are $^{100}C_2 = 4950$ overlaps to compute. Like `runTests`, `selectionPlot` may utilise multiple processors.
+
+Plot the distribution of overlaps of selected features of the DM and DD classifiers.
+
+```{r, message = FALSE, echo = FALSE}
+library(ClassifyR)
+load("data/classified.RData")
+```
+
+```{r, fig.align = "center", fig.width = 10, fig.height = 3}
+withinChoices <- selectionPlot(list(classifiedDM, classifiedDD),
+                               xVariable = "selectionName", xLabel = "Selection Method",
+                               columnVariable = "None",
+                               boxFillColouring = "None", boxLineColouring = "None",
+                               rotate90 = TRUE)
+```
+
+## Changing Elements of Saved Plots
+
+- Almost all plots produced by ClassifyR are `ggplot` objects created by ggplot2.
+
+- Such objects can be customised after creation because ggplot2 uses a 'painting-over' graphics model, unlike base R graphics.
+
+Change the plot title to "Chosen Genes Overlaps".<br>
+**Hint**: Use the `ggtitle` function from ggplot2.
+
+```{r, fig.align = "center", fig.width = 10, fig.height = 3}
+library(ggplot2)
+withinChoices + ggtitle("Chosen Genes Overlaps")
+```
+
+# Feature Selection Commonality
+
+- The features being selected by different classifications can be compared.
+
+- Again, `selectionPlot` is used.
+
+Compare the overlaps in features selected between DM and DD classifiers.<br>
+**Hint**: The `comparison` parameter of `selectionPlot` controls what kind of comparison is made.
+
+```{r, fig.align = "center", fig.width = 10, fig.height = 3}
+betweenChoices <- selectionPlot(list(classifiedDM, classifiedDD),
+                                comparison = "selectionName",
+                                xVariable = "selectionName", xLabel = "Selection Method",
+                                columnVariable = "None",
+                                boxFillColouring = "None", boxLineColouring = "None",
+                                rotate90 = TRUE)
+```
+
+Note that the sets of features chosen by the DM and DD classifiers have little in common.
+
+# Error / Accuracy of Predictions
+
+- `calcCVperformance` calculates performance metrics for `ClassifyResult` objects. 12 different metrics can be calculated.
+
+- Metrics are all applicable to data sets with two *or more* classes.
+
+- `calcExternalPerformance` can be used on a pair of factor vectors of the same length. For example,
+
+```{r}
+actualClasses <- factor(c("Yes", "Yes", "No", "No", "No"))
+predictedClasses <- factor(c("Yes", "No", "No", "No", "No"))
+calcExternalPerformance(actualClasses, predictedClasses, "error")
+calcExternalPerformance(actualClasses, predictedClasses, "accuracy")
+```
+
+## Balanced Error Rate for Resistance Classification
+
+- Class sizes of resistance data set are imbalanced. Errors should be summarised by the balanced error rate.
+
+For each of the three classifications done earlier, calculate the balanced error rate using `calcCVperformance`.<br>
+**Hint**: The value of the parameter named `performanceType` needs to be changed from its default, which is the ordinary error rate.
+
+```{r}
+classifiedDM <- calcCVperformance(classifiedDM, "balanced error")
+classifiedDD <- calcCVperformance(classifiedDD, "balanced error")
+classifiedClinical <- calcCVperformance(classifiedClinical, "balanced error")
+
+classifiedDM # Note that Performance Measures is no longer empty.
+```
+
+## Distribution of Balanced Error Rate
+
+`performancePlot` can be used to plot the distribution of a metric to see its stability. The set of samples was predicted 20 times by each classifier.
+
+Compare the distributions of balanced error rates of the three classifiers.<br>
+**Hint**: The value of the `performanceName` parameter needs to be changed to specify the balanced error rate.
+
+```{r, fig.width = 14, fig.height = 4}
+errorPlot <- performancePlot(list(classifiedDM, classifiedDD, classifiedClinical),
+                             performanceName = "Balanced Error Rate",
+                             boxFillColouring = "None", boxLineColouring = "None",
+                             columnVariable = "None", title = "Balanced Errors",
+                             xLabel = "Classifier", rotate90 = TRUE, plot = FALSE)
+library(ggplot2)
+errorPlot + geom_hline(yintercept = 0.5, colour = "red")
+```
+
+Note that DM classification is the only classifier which does substantially better than random.
+
+## Sample-specific Error Rate
+
+Calculate the sample-specific error rates for each patient.<br>
+**Hint**: Use again the function named `calcCVperformance`.
+
+```{r}
+classifiedDM <- calcCVperformance(classifiedDM, "sample error")
+classifiedDD <- calcCVperformance(classifiedDD, "sample error")
+classifiedClinical <- calcCVperformance(classifiedClinical, "sample error")
+classifiedClinical
+```
+
+Plot a heatmap of sample-wise errors using `samplesMetricMap`.<br>
+**Hint**: Change the value of `showXtickLabels` to remove the sample labels from the x-axis.
+
+```{r, fig.width = 10, fig.height = 5}
+errorPlot <- samplesMetricMap(list(classifiedDM, classifiedDD, classifiedClinical),
+                              xAxisLabel = "Samples", yAxisLabel = "Classifier",
+                              showXtickLabels = FALSE)
+```
+
+DLDA is the only method which has a similar error profile in the minority and majority class.
