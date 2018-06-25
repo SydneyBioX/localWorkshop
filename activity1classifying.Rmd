@@ -235,6 +235,55 @@ classifiedDM <- runTests(measurementsVS, classes, "AML", "Changes in Means",
 classifiedDM
 ```
 
+Doing this manually would be time consuming and difficult. The same classification written using simple R statements is long and there are many opportunities for introducing errors. There is no need to run it, but appreciate the complexity of the code.
+
+```{r, eval = FALSE}
+sampleOrdering <- lapply(1:20, function(permutation) sample(ncol(measurements)))
+sampleFold <- rep(1:5, length.out = ncol(measurements))
+samplesFolds <- lapply(sampleOrdering, function(sample) split(sample, sampleFold))
+library(limma)
+library(sparsediscrim)
+
+results <- lapply(1:20, function(permuteIndex)
+{
+  lapply(1:5, function(foldIndex)
+  {
+    # Subsetting of measurements and classes for training and test sets
+    testIndices <- samplesFolds[[permuteIndex]][[foldIndex]]
+    trainingValues <- measurementsVS[, -testIndices]
+    trainingClasses <- classes[-testIndices]
+    testingValues <- measurementsVS[, testIndices]
+    testClasses <- classes[testIndices]
+    
+    # Ranking by moderated t-test
+    linearModel <- lmFit(trainingValues, model.matrix(~ trainingClasses))
+    linearModel <- eBayes(linearModel)
+    topFeatures <- topTable(linearModel, coef = 2, number = Inf, sort.by = "p")
+    topIndices <- match(rownames(topFeatures), rownames(measurementsVS))
+    
+    # Picking the best top-p features based on resubstitition error.
+    resubErrors <- numeric()
+    topTry <- seq(10, 100, 10)
+    resubErrors <- lapply(topTry, function(topF)
+    {
+      trained <- dlda(t(trainingValues)[, topIndices[1:topF]], trainingClasses)
+      predicted <- predict(trained, t(trainingValues)[, topIndices[1:topF]])[["class"]]
+      sum(predicted != trainingClasses)
+    })
+    topF <- topTry[which.min(resubErrors)[1]] # Smallest in case of ties.
+    
+    # Training and prediction.
+    useFeatures <- rownames(measurementsVS)[topIndices[1:topF]]
+    trained <- dlda(t(trainingValues)[, useFeatures], trainingClasses)
+    predicted <- predict(trained, t(testingValues)[, useFeatures])
+    
+    list(chosen = useFeatures,
+         predictions = data.frame(ID = colnames(testingValues),
+                                  class = predicted[["class"]]))
+  })
+})
+```
+
 - Access the chosen features by using the `features` accessor, which extracts all of the feature selections at each iteration of cross-validation. View the features chosen in folds 1 and 2 of permutation 1.<br>
 **Hint**: The features are in a list of lists. The top-level list contains one element for each iteration and the second-level list contains one element for each fold.
 
@@ -324,7 +373,7 @@ As was done for DM classification, 20 permutations and 5 fold cross-validation i
 
 ```{r}
 classifiedDD <- runTests(measurementsVS, classes, "AML", "Changes in Distributions",
-                         params = list(selectParams, trainParams, predictParams), #<<
+                         params = list(selectParams, trainParams, predictParams),
                          permutations = 20, seed = 2018)
 classifiedDD
 ```

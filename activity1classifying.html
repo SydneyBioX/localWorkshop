@@ -418,6 +418,51 @@ classifiedDM</code></pre>
 ## Validation: 20 Permutations, 5 Folds.
 ## Predictions: List of data frames of length 20.
 ## Performance Measures: None calculated yet.</code></pre>
+<p>Doing this manually would be time consuming and difficult. The same classification written using simple R statements is long and there are many opportunities for introducing errors. There is no need to run it, but appreciate the complexity of the code.</p>
+<pre class="r"><code>sampleOrdering &lt;- lapply(1:20, function(permutation) sample(ncol(measurements)))
+sampleFold &lt;- rep(1:5, length.out = ncol(measurements))
+samplesFolds &lt;- lapply(sampleOrdering, function(sample) split(sample, sampleFold))
+library(limma)
+library(sparsediscrim)
+
+results &lt;- lapply(1:20, function(permuteIndex)
+{
+  lapply(1:5, function(foldIndex)
+  {
+    # Subsetting of measurements and classes for training and test sets
+    testIndices &lt;- samplesFolds[[permuteIndex]][[foldIndex]]
+    trainingValues &lt;- measurementsVS[, -testIndices]
+    trainingClasses &lt;- classes[-testIndices]
+    testingValues &lt;- measurementsVS[, testIndices]
+    testClasses &lt;- classes[testIndices]
+    
+    # Ranking by moderated t-test
+    linearModel &lt;- lmFit(trainingValues, model.matrix(~ trainingClasses))
+    linearModel &lt;- eBayes(linearModel)
+    topFeatures &lt;- topTable(linearModel, coef = 2, number = Inf, sort.by = &quot;p&quot;)
+    topIndices &lt;- match(rownames(topFeatures), rownames(measurementsVS))
+    
+    # Picking the best top-p features based on resubstitition error.
+    resubErrors &lt;- numeric()
+    topTry &lt;- seq(10, 100, 10)
+    resubErrors &lt;- lapply(topTry, function(topF)
+    {
+      trained &lt;- dlda(t(trainingValues)[, topIndices[1:topF]], trainingClasses)
+      predicted &lt;- predict(trained, t(trainingValues)[, topIndices[1:topF]])[[&quot;class&quot;]]
+      sum(predicted != trainingClasses)
+    })
+    topF &lt;- topTry[which.min(resubErrors)[1]] # Smallest in case of ties.
+    
+    # Training and prediction.
+    useFeatures &lt;- rownames(measurementsVS)[topIndices[1:topF]]
+    trained &lt;- dlda(t(trainingValues)[, useFeatures], trainingClasses)
+    predicted &lt;- predict(trained, t(testingValues)[, useFeatures])
+    
+    list(chosen = useFeatures,
+         predictions = data.frame(ID = colnames(testingValues),
+                                  class = predicted[[&quot;class&quot;]]))
+  })
+})</code></pre>
 <ul>
 <li>Access the chosen features by using the <code>features</code> accessor, which extracts all of the feature selections at each iteration of cross-validation. View the features chosen in folds 1 and 2 of permutation 1.<br> <strong>Hint</strong>: The features are in a list of lists. The top-level list contains one element for each iteration and the second-level list contains one element for each fold.</li>
 </ul>
@@ -488,7 +533,7 @@ head(frequencies)</code></pre>
 <h2><span class="header-section-number">8.1</span> DD Cross-validated Classification</h2>
 <p>As was done for DM classification, 20 permutations and 5 fold cross-validation is done. It takes substantially longer to complete than DM classification, because thousands of kernel densities are being esimated for each iteration.</p>
 <pre class="r"><code>classifiedDD &lt;- runTests(measurementsVS, classes, &quot;AML&quot;, &quot;Changes in Distributions&quot;,
-                         params = list(selectParams, trainParams, predictParams), #&lt;&lt;
+                         params = list(selectParams, trainParams, predictParams),
                          permutations = 20, seed = 2018)
 classifiedDD</code></pre>
 <pre><code>## An object of class 'ClassifyResult'.

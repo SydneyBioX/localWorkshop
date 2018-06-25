@@ -156,3 +156,16 @@ errorPlot <- samplesMetricMap(list(classifiedDM, classifiedDD, classifiedClinica
 ```
 
 DLDA is the only method which has a similar error profile in the minority and majority class.
+
+# Precision, Recall, F1 Score
+
+- Micro and macro versions of these metrics can be similarly calculated to the error rates demonstrated previously.
+
+- Use the macro version because each class makes an equal contribution to the metric, unlike for the micro version.
+
+Calculate the macro precision for the DM classifier using `calcCVperformance`.
+
+```{r}
+classifiedDM <- calcCVperformance(classifiedDM, "macro precision")
+performance(classifiedDM)[["Macro Precision"]]
+```
