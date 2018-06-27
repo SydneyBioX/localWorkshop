@@ -273,7 +273,7 @@ There are `r sum(diag(LRconfusion))` samples correctly predicted and `r sum(LRco
 
 Gene features should be chosen as the classifier performs slowly and badly if many uninformative features are present in the input table. The 10 largest absolute t-statistics will be used. `rowttests` function enables thousands of t-tests to be calculated quickly. The 10 best features are chosen for illustration; this number should be determined in a thoughtful way.
 
-```{r}
+```{r, message = FALSE}
 library(genefilter)
 tStatistic <- rowttests(measurementsVStrain, classesTrain)[["statistic"]]
 best10T <- order(abs(tStatistic), decreasing = TRUE)
@@ -320,7 +320,7 @@ NBconfusion
 
 There are `r sum(diag(NBconfusion))` samples correctly predicted and `r sum(NBconfusion) - sum(diag(NBconfusion))` samples incorrectly predicted.
 
-# After the Break {-}
+<span style = "font-size:34px;font-weight:300"> After the Break </span>
 
 - Basic cross-validation
 

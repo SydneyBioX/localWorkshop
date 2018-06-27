@@ -307,12 +307,12 @@ colnames(countsMatrix) &lt;- sapply(strsplit(basename(countsFiles), '_'), '[', 2
 <p>The clinical data provides information about several different characteristics of the patients. Verify that there is data for 250 patients.<br> <strong>Hint</strong>: <code>sampleInfo</code> is a <code>data.frame</code>. Each row stores data for one patient.</p>
 <pre class="r"><code>head(sampleInfo)</code></pre>
 <pre><code>##       ID Gender Age  Response Survival Time Status RUNX1-RUNX1T1 Fusion RUNX1 Mutation
-## 1 GEO-13   Male  47 Resistant            32   Dead                   No            Yes
-## 2 GEO-14   Male  38 Resistant           125   Dead                   No            Yes
-## 3 GEO-15 Female  38 Resistant             1   Dead                   No            Yes
-## 4 GEO-16   Male  37 Resistant            18   Dead                   No            Yes
-## 5 GEO-17   Male  33 Resistant           143   Dead                   No             No
-## 6 GEO-18   Male   7 Resistant           127  Alive                   No            Yes</code></pre>
+## 1 GEO-13   Male  70 Resistant           126   Dead                   No            Yes
+## 2 GEO-14   Male  61 Resistant           226   Dead                   No            Yes
+## 3 GEO-15 Female  61 Resistant           103   Dead                   No            Yes
+## 4 GEO-16   Male  60 Resistant           118   Dead                   No            Yes
+## 5 GEO-17   Male  56 Resistant           296   Dead                   No             No
+## 6 GEO-18   Male  25 Resistant           230  Alive                   No            Yes</code></pre>
 <pre class="r"><code>nrow(sampleInfo)</code></pre>
 <pre><code>## [1] 250</code></pre>
 <p>Observe the number of samples which are resistant to treatment and which are not.</p>
@@ -445,13 +445,8 @@ LRconfusion</code></pre>
 <div id="diagnonal-linear-discriminant-analysis-dlda" class="section level2">
 <h2><span class="header-section-number">5.3</span> Diagnonal Linear Discriminant Analysis (DLDA)</h2>
 <p>Gene features should be chosen as the classifier performs slowly and badly if many uninformative features are present in the input table. The 10 largest absolute t-statistics will be used. <code>rowttests</code> function enables thousands of t-tests to be calculated quickly. The 10 best features are chosen for illustration; this number should be determined in a thoughtful way.</p>
-<pre class="r"><code>library(genefilter)</code></pre>
-<pre><code>## 
-## Attaching package: 'genefilter'</code></pre>
-<pre><code>## The following objects are masked from 'package:matrixStats':
-## 
-##     rowSds, rowVars</code></pre>
-<pre class="r"><code>tStatistic &lt;- rowttests(measurementsVStrain, classesTrain)[[&quot;statistic&quot;]]
+<pre class="r"><code>library(genefilter)
+tStatistic &lt;- rowttests(measurementsVStrain, classesTrain)[[&quot;statistic&quot;]]
 best10T &lt;- order(abs(tStatistic), decreasing = TRUE)</code></pre>
 <p>An implementation of DLDA is provided by the R package sparsediscrim. The <code>dlda</code> function trains the classifier and the <code>predict</code> function is used to make predictions on test data. It requires that the features be the columns of the table.</p>
 <pre class="r"><code>library(sparsediscrim)
@@ -489,14 +484,12 @@ NBconfusion</code></pre>
 ##   Resistant        12         3
 ##   Sensitive        21        22</code></pre>
 <p>There are 34 samples correctly predicted and 24 samples incorrectly predicted.</p>
-</div>
-</div>
-<div id="after-the-break" class="section level1 unnumbered">
-<h1>After the Break</h1>
+<p><span style="font-size:34px;font-weight:300"> After the Break </span></p>
 <ul>
 <li><p>Basic cross-validation</p></li>
 <li><p>Introduction to ClassifyR</p></li>
 </ul>
+</div>
 </div>
 
 
