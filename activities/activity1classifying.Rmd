@@ -1,6 +1,6 @@
 ---
 title: "Selecting Biomarkers and Making Predictions"
-author: "Ellis Patrick"
+author: "Dario Strbenac"
 date: "29 June 2018"
 output:
   html_document:
@@ -27,9 +27,30 @@ options(width = 91)
 
 - Fitting widely used classifiers to a simple partition of the data set
 
+# Preparation
+
+To complete todays workshops you will need to have R and Rstudio installed on your computer.  
+You should create a directory for todays workshop to save all of your work.  
+
+You should open a new rmarkdown (Rmd) document. You will write all of your code here.
+
+You will also need to install the following R packages.
+
+```{r}
+source("https://bioconductor.org/biocLite.R")
+biocLite("ClassifyR")
+biocLite("DESeq2")
+biocLite("EDASeq")
+biocLite("genefilter")
+install.packages('tidyverse')
+install.packages('sparsediscrim')
+install.packages('e1071')
+```
+
+
 # RNA-seq Data Set: Acute Myeloid Leukaemia (AML) Treatment Resistance
 
-- Primary therapy resistance is a major problem in acute myeloid leukemia treatment. Approximately 20–30% of younger adult patients with AML and as many as 50% of older adults are refractory to induction treatment.
+- Primary therapy resistance is a major problem in acute myeloid leukemia treatment. Approximately 20-30% of younger adult patients with AML and as many as 50% of older adults are refractory to induction treatment.
 
 - Research findings are <a href="http://www.haematologica.org/content/103/3/456" target="_blank">published</a> in *Haematologica* in 2018.
 
