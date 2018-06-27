@@ -26,6 +26,242 @@ opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
 
 - Comparison of various classifiers.
 
+# ClassifyR
+
+- A *framework* for feature selection, cross-validated classification and its performance evaluation.
+
+- Some popular feature selection methods and classifiers implemented in the package.
+
+- Runs cross-validation in parallel on Windows, MacOS, Linux operating systems.
+
+- Supports numeric-only (`matrix`) data, mixed numeric-categorical (`DataFrame`) data and multi-omics data (`MultiAssayExperiment`).
+
+- Continually maintained and supported (first released in 2014).
+
+## Parameter Objects
+
+- Each stage of classification is defined by a parameter object.
+
+- The four main types of objects are `TransformParams`, `SelectParams`, `TrainParams` and `PredictParams`.
+
+- `TransformParams` and `SelectParams` are optional.
+
+## Cross-validation
+
+- The process of creating many different training and test sets is handled by `runTests`.
+
+- The `seed` option allows the specification of a number which results in cross-validations which rely on random splits to be reproduced if the code is rerun, even if it runs on multiple cores.
+
+- The result of running `runTests` is a `ClassifyResult` object, which many performance evaluation functions use.
+
+- A `ClassifyResult` object stores the class predictions and possibly also class scores as well as the features selected at each cross-validation iteration.
+
+## Parallel Processing
+
+- By default, 2 less cores than the computer has are used.
+
+- On Windows, use `parallelParams = SnowParam(workers = 8)` to use 8 cores and on Linux or MacOS use `parallelParams = MulticoreParam(workers = 8)` as an argument to achieve the same customisation.
+
+## Getting Help
+
+- Every Bioconductor package has a vignette which demonstrates the main usage on an example data set. ClassifyR's HTML vignette is available from the <a href="https://bioconductor.org/packages/release/bioc/html/ClassifyR.html" target="_blank">package's home page</a>.
+
+- The <a href="https://support.bioconductor.org/" target="_blank">Bioconductor Support Forum</a> is the best communication channel to ask questions about Bioconductor packages, such as ClassifyR.
+
+# DLDA - Differential Means Classifier for AML Resistance
+
+Load ClassifyR.
+
+```{r, message = FALSE}
+library(ClassifyR)
+```
+
+- The default feature selection method of `SelectParams` is a moderated t-test based ranking and selection of the top $p$ genes that give the best resubstitution error (considering 10, 20, ..., 100 top-ranked features). See `?SelectParams` for the specification.
+
+- The default training and prediction methods for `TrainParams` and `PredictParams` are for Diagonal Linear Discriminant Analysis (DLDA). See `?TrainParams` and `?PredictParams` for the specification.
+
+A 20 permutations and 5 folds cross-validation using default selection and classification methods is done using `runTests`. Read its documentation to understand the options available.
+
+```{r}
+classifiedDM <- runTests(measurementsVS, classes, "AML", "Changes in Means",
+                         permutations = 20, seed = 2018)
+classifiedDM
+```
+
+Doing this manually would be time consuming and difficult. The same classification written using simple R statements is long and there are many opportunities for introducing errors. There is no need to run it, but appreciate the complexity of the code.
+
+```{r, eval = FALSE}
+sampleOrdering <- lapply(1:20, function(permutation) sample(ncol(measurements)))
+sampleFold <- rep(1:5, length.out = ncol(measurements))
+samplesFolds <- lapply(sampleOrdering, function(sample) split(sample, sampleFold))
+library(limma)
+library(sparsediscrim)
+
+results <- lapply(1:20, function(permuteIndex)
+{
+  lapply(1:5, function(foldIndex)
+  {
+    # Subsetting of measurements and classes for training and test sets
+    testIndices <- samplesFolds[[permuteIndex]][[foldIndex]]
+    trainingValues <- measurementsVS[, -testIndices]
+    trainingClasses <- classes[-testIndices]
+    testingValues <- measurementsVS[, testIndices]
+    testClasses <- classes[testIndices]
+    
+    # Ranking by moderated t-test
+    linearModel <- lmFit(trainingValues, model.matrix(~ trainingClasses))
+    linearModel <- eBayes(linearModel)
+    topFeatures <- topTable(linearModel, coef = 2, number = Inf, sort.by = "p")
+    topIndices <- match(rownames(topFeatures), rownames(measurementsVS))
+    
+    # Picking the best top-p features based on resubstitition error.
+    resubErrors <- numeric()
+    topTry <- seq(10, 100, 10)
+    resubErrors <- lapply(topTry, function(topF)
+    {
+      trained <- dlda(t(trainingValues)[, topIndices[1:topF]], trainingClasses)
+      predicted <- predict(trained, t(trainingValues)[, topIndices[1:topF]])[["class"]]
+      sum(predicted != trainingClasses)
+    })
+    topF <- topTry[which.min(resubErrors)[1]] # Smallest in case of ties.
+    
+    # Training and prediction.
+    useFeatures <- rownames(measurementsVS)[topIndices[1:topF]]
+    trained <- dlda(t(trainingValues)[, useFeatures], trainingClasses)
+    predicted <- predict(trained, t(testingValues)[, useFeatures])
+    
+    list(chosen = useFeatures,
+         predictions = data.frame(ID = colnames(testingValues),
+                                  class = predicted[["class"]]))
+  })
+})
+```
+
+- Access the chosen features by using the `features` accessor, which extracts all of the feature selections at each iteration of cross-validation. View the features chosen in folds 1 and 2 of permutation 1.<br>
+**Hint**: The features are in a list of lists. The top-level list contains one element for each iteration and the second-level list contains one element for each fold.
+
+
+```{r}
+# Permutation 1, folds 1 and 2.
+features(classifiedDM)[[1]][1:2]
+```
+
+- The `predictions` accessor gets all of the class predictions. View the first few predictions of the first permutation.<br>
+**Hint**: The predictions are stored in a list, one for each permutation and have as many rows as there are samples. Use `head` to limit the number of predictions displayed.
+
+```{r}
+# Permutation 1
+head(predictions(classifiedDM)[[1]])
+```
+
+The `distribution` function calculates the feature selection frequency of all features. Use `?distribution` to find out about it and determine the most frequently selected feature.<br>
+**Hint**: Use the `sort function` on the output of the `distribution` function.
+
+## Most Frequently Selected Feature
+
+```{r}
+frequencies <- distribution(classifiedDM, plot = FALSE)
+frequencies <- sort(frequencies, decreasing = TRUE)
+head(frequencies)
+```
+
+`r names(frequencies)[1]` is chosen `r frequencies[1]` out of 100 possible times.
+
+The distribution of gene expression per class can be quickly visualised with `plotFeatureClasses`.<br>
+**Hint**: The `targets` parameter of `plotFeatureClasses` specifies one or more features to be plotted.
+
+```{r, fig.height = 4, fig.width = 7, fig.align = "center"}
+plotFeatureClasses(measurementsVS, classes, targets = names(frequencies)[1],
+                   whichNumericPlots = "density", xAxisLabel = "RNA-seq Abundance")
+```
+
+The gene is visibly differentially expressed between resistant and sensitive patients.
+
+## Clinical Data Quality Check
+
+ZFY is a gene on the Y chromosome which only males have. Plot its expression with the gender in place of the treatment resistance classes.
+
+```{r, fig.height = 4, fig.width = 7, fig.align = "center"}
+plotFeatureClasses(measurementsVS, sampleInfo[, "Gender"], targets = "ZFY",
+                   whichNumericPlots = "density", xAxisLabel = "RNA-seq Abundance")
+```
+
+The abundance grouped by gender is as expected.
+
+# Logsitic Regression - DM Classifier for AML Resistance Using Clinical Data
+
+- Classifier built using only the routinely collected clinical information.
+
+- *Multinomial* logistic regression is not available by default in R, but is available from mnlogit.
+
+- `logisticRegressionTrainInterface` is a wrapper around the `mnlogit` fitting function.
+
+- `logisticRegressionPredictInterface` is a wrapper around the `predict` function for objects of class `mnlogit`.
+
+Specify the training and prediction parameter settings.<br>
+**Hint**: Use `?logisticRegressionTrainInterface` and note that it returns a vector of classes. Therefore, specify an identity function for `getClasses` to `PredictParams`.
+
+```{r}
+trainParams <- TrainParams(logisticRegressionTrainInterface)
+predictParams <- PredictParams(logisticRegressionPredictInterface,
+                               getClasses = function(result) result)
+```
+
+Run 20 permutations and 5 folds cross-validation, ignoring GEO ID, Survival Time and Status.
+
+```{r}
+ignoreColumns <- match(c("ID", "Survival Time", "Status"), colnames(sampleInfo))
+ignoreColumns
+classifiedClinical <- runTests(DataFrame(sampleInfo[, -ignoreColumns]), "Response",
+                               "AML", "Clinical",
+                               params = list(trainParams, predictParams),
+                               permutations = 20, seed = 2018)
+classifiedClinical
+```
+
+# naive Bayes - Differential Distribution (DD) Classifier for AML Resistance
+
+Numerous DD selection methods are available in ClassifyR. <a href="https://bioconductor.org/packages/release/bioc/vignettes/ClassifyR/inst/doc/ClassifyR.html#provided-feature-selection-and-classification-methods" target="_blank">Section 0.9 of the vignette</a> gives an overview. For this example, Kullback-Leibler divergence will be used. Navigate to the Reference Manual (PDF) of <a href="https://bioconductor.org/packages/release/bioc/html/ClassifyR.html" target="_blank">ClassifyR</a> to see the formula.
+
+Create a selection parameter object specifying the use of Kullback-Leibler feature selection.<br>
+**Hint**: `KullbackLeiblerSelection` is the name of the function to be specified. Information about the type of location and scale calculated is documented for `...`
+
+```{r}
+selectParams <- SelectParams(KullbackLeiblerSelection,
+                             resubstituteParams = ResubstituteParams())
+```
+
+By default, the mean is the location and the standard deviation is the scale.
+
+A variety of DD classifiers are available in ClassifyR. For this example, the naive Bayes method will be used. The difference of the height (scaled by the number of samples in each class) between the kernel densities of the two classes is used by each gene to vote for one class. The class with the most votes is the predicted class of the patient.
+
+Create a training parameter object specifying the use of the naive Bayes classifier.
+
+```{r}
+trainParams <- TrainParams(naiveBayesKernel)
+```
+
+Create a prediction parameter object specifying the use the height difference between densities and unweighted voting. `naiveBayesKernel` trains a classifier and returns a factor vector of class predictions, so there is no other function used for predictions.<br>
+**Hint**: Use `?naiveBayesKernel` to see the names of the parameters controlling the voting process. Specify an identity function for `getClasses`.
+
+```{r}
+predictParams <- PredictParams(NULL, weighted = "unweighted", weight = "height difference",
+                               getClasses = function(result) result)
+```
+
+## DD Cross-validated Classification
+
+As was done for DM classification, 20 permutations and 5 fold cross-validation is done. It takes substantially longer to complete than DM classification, because thousands of kernel densities are being esimated for each iteration.
+
+```{r}
+classifiedDD <- runTests(measurementsVS, classes, "AML", "Changes in Distributions",
+                         params = list(selectParams, trainParams, predictParams),
+                         permutations = 20, seed = 2018)
+classifiedDD
+```
+
+Evaluation of these three classifiers will be made in the subsequent tutorial.
+
 # Feature Selection Stability
 
 - If the genes being selected are the same ones in most of the cross-validations, then the classifier has good stability.

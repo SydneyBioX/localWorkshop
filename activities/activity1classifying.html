@@ -247,9 +247,9 @@ div.tocify {
 <div id="activity-overview" class="section level1">
 <h1><span class="header-section-number">1</span> Activity Overview</h1>
 <ul>
-<li><p>RNA-seq Data Set: Acute Myeloid Leukaemia Treatment Resistance</p></li>
-<li><p>ClassifyR: Biomarker Selection Methods and Cross-validation</p></li>
-<li><p>Differential Means and Differential Distribution Classifiers for Classifying AML Patients</p></li>
+<li><p>RNA-seq data set: Acute Myeloid Leukaemia treatment resistance</p></li>
+<li><p>Exploratory data analysis and visualisation</p></li>
+<li><p>Fitting widely used classifiers to a simple partition of the data set</p></li>
 </ul>
 </div>
 <div id="rna-seq-data-set-acute-myeloid-leukaemia-aml-treatment-resistance" class="section level1">
@@ -260,16 +260,51 @@ div.tocify {
 <li><p>The data is available from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106291" target="_blank">GEO Browser</a> as 250 <code>txt.gz</code> files of gene-level read counts or a Microsoft Excel file where the gene expression values were standardised to have a mean of 0 and variance of 1.</p></li>
 </ul>
 </div>
-<div id="data-import-and-exploration" class="section level1">
+<div id="data-import-and-exploration" class="section level1 tabset tabset-fade tabset-pills">
 <h1><span class="header-section-number">3</span> Data Import and Exploration</h1>
-<p>Import the prepared tab-separated text files of RNA-seq read counts and clinical data.<br> <strong>Hint</strong>: The <code>read.delim</code> function should be used. The matrix contains integers, so convert it to a <code>matrix</code> after import.</p>
-<pre class="r"><code>readCounts &lt;- read.delim(&quot;data/counts.txt&quot;, check.names = FALSE)
+<p>Importing RNA-seq data from GEO Browser into R is a difficult process. Import the prepared tab-separated text files of RNA-seq read counts and clinical data from GitHub.</p>
+<div id="import-prepared-files-from-github" class="section level2">
+<h2><span class="header-section-number">3.1</span> Import Prepared Files From GitHub</h2>
+<pre class="r"><code>readCounts &lt;- read.delim(url(&quot;https://raw.githubusercontent.com/SydneyBioX/localWorkshop/master/data/counts.txt&quot;), check.names = FALSE)
 readCounts &lt;- as.matrix(readCounts)
-sampleInfo &lt;- read.delim(&quot;data/samples.txt&quot;, check.names = FALSE)</code></pre>
+sampleInfo &lt;- read.delim(url(&quot;https://raw.githubusercontent.com/SydneyBioX/localWorkshop/master/data/samples.txt&quot;), check.names = FALSE)</code></pre>
 <p><code>check.names = FALSE</code> prevents R unnecessarily changing hyphens and spaces in column names to periods.</p>
+</div>
+<div id="download-and-format-tables-from-geo" class="section level2">
+<h2><span class="header-section-number">3.2</span> Download and Format Tables From GEO</h2>
+<p>Observe that the process is not streamlined, but do not run the code.</p>
+<pre class="r"><code>library(GEOquery)
+library(tools)
+
+clinical &lt;- pData(getGEO(&quot;GSE106291&quot;)[[1]])
+keepColumns &lt;- c(&quot;title&quot;, &quot;characteristics_ch1.2&quot;, &quot;characteristics_ch1.3&quot;,
+                 &quot;characteristics_ch1.4&quot;, &quot;characteristics_ch1.5&quot;,
+                 &quot;characteristics_ch1.6&quot;, &quot;characteristics_ch1.8&quot;,
+                 &quot;characteristics_ch1.9&quot;)
+clinical &lt;- clinical[, keepColumns]
+colnames(clinical) &lt;- c(&quot;ID&quot;, &quot;Gender&quot;, &quot;Age&quot;, &quot;Response&quot;, &quot;Survival Time&quot;, &quot;Status&quot;,
+                        &quot;RUNX1-RUNX1T1 Fusion&quot;, &quot;RUNX1 Mutation&quot;)
+clinical &lt;- data.frame(lapply(clinical, as.character),
+                       check.names = FALSE, stringsAsFactors = FALSE)
+removedColumnNames &lt;- lapply(clinical, function(dataColumn)
+                             toTitleCase(gsub(&quot;.*: &quot;, '', dataColumn)))
+clinical &lt;- data.frame(removedColumnNames, check.names = FALSE)
+
+library(readr)
+tempFile &lt;- file.path(tempdir(), &quot;countsPack.tar&quot;)
+download.file(&quot;https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE106291&amp;format=file&quot;,
+              destfile = tempFile)
+untar(tempFile, exdir = dirname(tempFile))
+countsFiles &lt;- list.files(dirname(tempFile), &quot;^GSM&quot;, full.names = TRUE)
+sampleCounts &lt;- lapply(countsFiles, function(file)
+                       read_delim(file, '\t', col_names = FALSE))
+countsMatrix &lt;- do.call(cbind, lapply(sampleCounts, &quot;[[&quot;, 2))
+rownames(countsMatrix) &lt;- sampleCounts[[1]][[1]]
+colnames(countsMatrix) &lt;- sapply(strsplit(basename(countsFiles), '_'), '[', 2)</code></pre>
+</div>
 <div id="the-clinical-data" class="section level2">
-<h2><span class="header-section-number">3.1</span> The Clinical Data</h2>
-<p>The cinical data provides information about several different characteristics of the patients. Verify that there is data for 250 patients.<br> <strong>Hint</strong>: <code>sampleInfo</code> is a <code>data.frame</code>. Each row stores data for one patient.</p>
+<h2><span class="header-section-number">3.3</span> The Clinical Data</h2>
+<p>The clinical data provides information about several different characteristics of the patients. Verify that there is data for 250 patients.<br> <strong>Hint</strong>: <code>sampleInfo</code> is a <code>data.frame</code>. Each row stores data for one patient.</p>
 <pre class="r"><code>head(sampleInfo)</code></pre>
 <pre><code>##       ID Gender Age  Response Survival Time Status RUNX1-RUNX1T1 Fusion RUNX1 Mutation
 ## 1 GEO-13   Male  47 Resistant            32   Dead                   No            Yes
@@ -289,6 +324,9 @@ sampleInfo &lt;- read.delim(&quot;data/samples.txt&quot;, check.names = FALSE)</
 <pre class="r"><code>removeClinical &lt;- which(is.na(sampleInfo[, &quot;Response&quot;]))
 readCounts &lt;- readCounts[, -removeClinical]
 sampleInfo &lt;- sampleInfo[-removeClinical, ]</code></pre>
+<p>Remove outcome variables other than Response from the clinical table.</p>
+<pre class="r"><code>ignoreClinical &lt;- match(c(&quot;ID&quot;, &quot;Status&quot;, &quot;Survival Time&quot;), colnames(sampleInfo))
+sampleInfo &lt;-sampleInfo[, -ignoreClinical]</code></pre>
 </div>
 </div>
 <div id="properties-of-rna-seq-measurements" class="section level1">
@@ -375,229 +413,90 @@ measurementsVS[1:6, 1:6]</code></pre>
 <p>Class information is not used, so the filtering is fair. The most variable gene is XIST, a gene involved with X chromosome inactivation, a process by which one of the two copies of the X chromosome present in female mammals is inactivated.</p>
 </div>
 </div>
-<div id="classifyr" class="section level1">
-<h1><span class="header-section-number">5</span> ClassifyR</h1>
-<ul>
-<li><p>A <em>framework</em> for feature selection, cross-validated classification and its performance evaluation.</p></li>
-<li><p>Some popular feature selection methods and classifiers implemented in the package.</p></li>
-<li><p>Runs cross-validation in parallel on Windows, MacOS, Linux operating systems.</p></li>
-<li><p>Supports numeric-only (<code>matrix</code>) data, mixed numeric-categorical (<code>DataFrame</code>) data and multi-omics data (<code>MultiAssayExperiment</code>).</p></li>
-<li><p>Continually maintained and supported (first released in 2014).</p></li>
-</ul>
-<div id="parameter-objects" class="section level2">
-<h2><span class="header-section-number">5.1</span> Parameter Objects</h2>
-<ul>
-<li><p>Each stage of classification is defined by a parameter object.</p></li>
-<li><p>The four main types of objects are <code>TransformParams</code>, <code>SelectParams</code>, <code>TrainParams</code> and <code>PredictParams</code>.</p></li>
-<li><p><code>TransformParams</code> and <code>SelectParams</code> are optional.</p></li>
-</ul>
+<div id="simple-classification" class="section level1">
+<h1><span class="header-section-number">5</span> Simple Classification</h1>
+<p>Before the ClassifyR framework is used, simple illustrative classifications using three classifiers are done.</p>
+<div id="training-and-test-sets" class="section level2">
+<h2><span class="header-section-number">5.1</span> Training and Test Sets</h2>
+<p>Split the samples into a training set and a test set.</p>
+<pre class="r"><code>measurementsVStrain &lt;- measurementsVS[, 1:59]
+measurementsVStest &lt;- measurementsVS[, 60:117]
+clinicalTrain &lt;- sampleInfo[1:59, ]
+clinicalTest &lt;- sampleInfo[60:117, ]
+classesTrain &lt;- classes[1:59]
+classesTest &lt;- classes[60:117]</code></pre>
 </div>
-<div id="cross-validation" class="section level2">
-<h2><span class="header-section-number">5.2</span> Cross-validation</h2>
-<ul>
-<li><p>The process of creating many different training and test sets is handled by <code>runTests</code>.</p></li>
-<li><p>The <code>seed</code> option allows the specification of a number which results in cross-validations which rely on random splits to be reproduced if the code is rerun, even if it runs on multiple cores.</p></li>
-<li><p>The result of running <code>runTests</code> is a <code>ClassifyResult</code> object, which many performance evaluation functions use.</p></li>
-<li><p>A <code>ClassifyResult</code> object stores the class predictions and possibly also class scores as well as the features selected at each cross-validation iteration.</p></li>
-</ul>
+<div id="logistic-regression" class="section level2">
+<h2><span class="header-section-number">5.2</span> Logistic Regression</h2>
+<p>This technique is useful for classifying the clinical data as it works seamlessly with numeric and categorical data. R’s <code>glm</code> function can build such a classifier if there are exactly 2 classes of samples. The <code>predict</code> function is used to make predictions for the test set samples. The option <code>type = &quot;response&quot;</code> specifies that probabilities should be calculated. There’s no option to output class labels directly.</p>
+<p>RUNX1-RUNX1T1 Fusion is rare and removed from the analysis because it only happens for 3 people. Every factor variable in the input table for logistic regression must have at least one observation in each class.</p>
+<pre class="r"><code>fusionColumn &lt;- match(&quot;RUNX1-RUNX1T1 Fusion&quot;, colnames(clinicalTrain))
+LRclassifier &lt;- glm(Response ~ ., &quot;binomial&quot;, clinicalTrain[, -fusionColumn])
+LRprobabilities &lt;- predict(LRclassifier, clinicalTest[, -fusionColumn], type = &quot;response&quot;)
+LRclasses &lt;- ifelse(LRprobabilities &gt; 0.5, levels(classes)[2], levels(classes)[1])
+LRconfusion &lt;- table(actual = classesTest, predicted = LRclasses)
+LRconfusion</code></pre>
+<pre><code>##            predicted
+## actual      Resistant Sensitive
+##   Resistant         4        11
+##   Sensitive         6        37</code></pre>
+<p>There are 41 samples correctly predicted and 17 samples incorrectly predicted.</p>
 </div>
-<div id="parallel-processing" class="section level2">
-<h2><span class="header-section-number">5.3</span> Parallel Processing</h2>
-<ul>
-<li><p>By default, 2 less cores than the computer has are used.</p></li>
-<li><p>On Windows, use <code>parallelParams = SnowParam(workers = 8)</code> to use 8 cores and on Linux or MacOS use <code>parallelParams = MulticoreParam(workers = 8)</code> as an argument to achieve the same customisation.</p></li>
-</ul>
-</div>
-<div id="getting-help" class="section level2">
-<h2><span class="header-section-number">5.4</span> Getting Help</h2>
-<ul>
-<li><p>Every Bioconductor package has a vignette which demonstrates the main usage on an example data set. ClassifyR’s HTML vignette is available from the <a href="https://bioconductor.org/packages/release/bioc/html/ClassifyR.html" target="_blank">package’s home page</a>.</p></li>
-<li><p>The <a href="https://support.bioconductor.org/" target="_blank">Bioconductor Support Forum</a> is the best communication channel to ask questions about Bioconductor packages, such as ClassifyR.</p></li>
-</ul>
-</div>
-</div>
-<div id="dlda---differential-means-classifier-for-aml-resistance" class="section level1">
-<h1><span class="header-section-number">6</span> DLDA - Differential Means Classifier for AML Resistance</h1>
-<p>Load ClassifyR.</p>
-<pre class="r"><code>library(ClassifyR)</code></pre>
-<ul>
-<li><p>The default feature selection method of <code>SelectParams</code> is a moderated t-test based ranking and selection of the top <span class="math inline">\(p\)</span> genes that give the best resubstitution error (considering 10, 20, …, 100 top-ranked features). See <code>?SelectParams</code> for the specification.</p></li>
-<li><p>The default training and prediction methods for <code>TrainParams</code> and <code>PredictParams</code> are for Diagonal Linear Discriminant Analysis (DLDA). See <code>?TrainParams</code> and <code>?PredictParams</code> for the specification.</p></li>
-</ul>
-<p>A 20 permutations and 5 folds cross-validation using default selection and classification methods is done using <code>runTests</code>. Read its documentation to understand the options available.</p>
-<pre class="r"><code>classifiedDM &lt;- runTests(measurementsVS, classes, &quot;AML&quot;, &quot;Changes in Means&quot;,
-                         permutations = 20, seed = 2018)
-classifiedDM</code></pre>
-<pre><code>## An object of class 'ClassifyResult'.
-## Data Set Name: AML.
-## Classification Name: Changes in Means.
-## Feature Selection Name: Limma moderated t-test.
-## Features: List of length 20 of lists of length 5 of feature identifiers.
-## Validation: 20 Permutations, 5 Folds.
-## Predictions: List of data frames of length 20.
-## Performance Measures: None calculated yet.</code></pre>
-<p>Doing this manually would be time consuming and difficult. The same classification written using simple R statements is long and there are many opportunities for introducing errors. There is no need to run it, but appreciate the complexity of the code.</p>
-<pre class="r"><code>sampleOrdering &lt;- lapply(1:20, function(permutation) sample(ncol(measurements)))
-sampleFold &lt;- rep(1:5, length.out = ncol(measurements))
-samplesFolds &lt;- lapply(sampleOrdering, function(sample) split(sample, sampleFold))
-library(limma)
-library(sparsediscrim)
-
-results &lt;- lapply(1:20, function(permuteIndex)
-{
-  lapply(1:5, function(foldIndex)
-  {
-    # Subsetting of measurements and classes for training and test sets
-    testIndices &lt;- samplesFolds[[permuteIndex]][[foldIndex]]
-    trainingValues &lt;- measurementsVS[, -testIndices]
-    trainingClasses &lt;- classes[-testIndices]
-    testingValues &lt;- measurementsVS[, testIndices]
-    testClasses &lt;- classes[testIndices]
-    
-    # Ranking by moderated t-test
-    linearModel &lt;- lmFit(trainingValues, model.matrix(~ trainingClasses))
-    linearModel &lt;- eBayes(linearModel)
-    topFeatures &lt;- topTable(linearModel, coef = 2, number = Inf, sort.by = &quot;p&quot;)
-    topIndices &lt;- match(rownames(topFeatures), rownames(measurementsVS))
-    
-    # Picking the best top-p features based on resubstitition error.
-    resubErrors &lt;- numeric()
-    topTry &lt;- seq(10, 100, 10)
-    resubErrors &lt;- lapply(topTry, function(topF)
-    {
-      trained &lt;- dlda(t(trainingValues)[, topIndices[1:topF]], trainingClasses)
-      predicted &lt;- predict(trained, t(trainingValues)[, topIndices[1:topF]])[[&quot;class&quot;]]
-      sum(predicted != trainingClasses)
-    })
-    topF &lt;- topTry[which.min(resubErrors)[1]] # Smallest in case of ties.
-    
-    # Training and prediction.
-    useFeatures &lt;- rownames(measurementsVS)[topIndices[1:topF]]
-    trained &lt;- dlda(t(trainingValues)[, useFeatures], trainingClasses)
-    predicted &lt;- predict(trained, t(testingValues)[, useFeatures])
-    
-    list(chosen = useFeatures,
-         predictions = data.frame(ID = colnames(testingValues),
-                                  class = predicted[[&quot;class&quot;]]))
-  })
-})</code></pre>
-<ul>
-<li>Access the chosen features by using the <code>features</code> accessor, which extracts all of the feature selections at each iteration of cross-validation. View the features chosen in folds 1 and 2 of permutation 1.<br> <strong>Hint</strong>: The features are in a list of lists. The top-level list contains one element for each iteration and the second-level list contains one element for each fold.</li>
-</ul>
-<pre class="r"><code># Permutation 1, folds 1 and 2.
-features(classifiedDM)[[1]][1:2]</code></pre>
-<pre><code>## [[1]]
-##  [1] &quot;BEND4&quot;     &quot;KLF9&quot;      &quot;ID2&quot;       &quot;JDP2&quot;      &quot;ADAMTS10&quot;  &quot;CYYR1&quot;     &quot;SLA&quot;      
-##  [8] &quot;SLITRK5&quot;   &quot;GAS2L1&quot;    &quot;ALDH2&quot;     &quot;PANX2&quot;     &quot;LSP1&quot;      &quot;ITPRIP&quot;    &quot;EHD1&quot;     
-## [15] &quot;SOD2&quot;      &quot;PLAUR&quot;     &quot;PLEKHO2&quot;   &quot;DGAT2&quot;     &quot;TUBA4A&quot;    &quot;HIST3H2A&quot;  &quot;INHBA&quot;    
-## [22] &quot;ID1&quot;       &quot;PSD3&quot;      &quot;HRH2&quot;      &quot;LAMP5&quot;     &quot;NOTCH3&quot;    &quot;IL1R1&quot;     &quot;LTK&quot;      
-## [29] &quot;FAM43A&quot;    &quot;TSPO&quot;      &quot;BAIAP2&quot;    &quot;RASL11A&quot;   &quot;NEDD9&quot;     &quot;LDLR&quot;      &quot;CDKN2D&quot;   
-## [36] &quot;ZBTB7B&quot;    &quot;DDIT4L&quot;    &quot;DUSP7&quot;     &quot;LILRA3&quot;    &quot;LOC728606&quot;
+<div id="diagnonal-linear-discriminant-analysis-dlda" class="section level2">
+<h2><span class="header-section-number">5.3</span> Diagnonal Linear Discriminant Analysis (DLDA)</h2>
+<p>Gene features should be chosen as the classifier performs slowly and badly if many uninformative features are present in the input table. The 10 largest absolute t-statistics will be used. <code>rowttests</code> function enables thousands of t-tests to be calculated quickly. The 10 best features are chosen for illustration; this number should be determined in a thoughtful way.</p>
+<pre class="r"><code>library(genefilter)</code></pre>
+<pre><code>## 
+## Attaching package: 'genefilter'</code></pre>
+<pre><code>## The following objects are masked from 'package:matrixStats':
 ## 
-## [[2]]
-##  [1] &quot;INHBA&quot;     &quot;SLITRK5&quot;   &quot;BEND4&quot;     &quot;LOC728606&quot; &quot;CYYR1&quot;     &quot;LTK&quot;       &quot;DDIT4L&quot;   
-##  [8] &quot;TUBA4A&quot;    &quot;ADAMTS10&quot;  &quot;FAM171B&quot;   &quot;SH3BP5&quot;    &quot;TNFRSF10C&quot; &quot;HIST3H2A&quot;  &quot;ZNF135&quot;   
-## [15] &quot;ID1&quot;       &quot;LAMC1&quot;     &quot;ALDH2&quot;     &quot;LPHN1&quot;     &quot;PLAUR&quot;     &quot;LSP1&quot;      &quot;APP&quot;      
-## [22] &quot;SLA&quot;       &quot;CCNA1&quot;     &quot;DES&quot;       &quot;NR4A1&quot;     &quot;NEDD9&quot;     &quot;ID2&quot;       &quot;IL1R2&quot;    
-## [29] &quot;SOD2&quot;      &quot;CAMK4&quot;     &quot;GOLGA8B&quot;   &quot;QPCT&quot;      &quot;KLF9&quot;      &quot;HTRA3&quot;     &quot;PEAR1&quot;    
-## [36] &quot;LILRA5&quot;    &quot;PBX3&quot;      &quot;CDCP1&quot;     &quot;ITGB3&quot;     &quot;SCRN1&quot;</code></pre>
+##     rowSds, rowVars</code></pre>
+<pre class="r"><code>tStatistic &lt;- rowttests(measurementsVStrain, classesTrain)[[&quot;statistic&quot;]]
+best10T &lt;- order(abs(tStatistic), decreasing = TRUE)</code></pre>
+<p>An implementation of DLDA is provided by the R package sparsediscrim. The <code>dlda</code> function trains the classifier and the <code>predict</code> function is used to make predictions on test data. It requires that the features be the columns of the table.</p>
+<pre class="r"><code>library(sparsediscrim)
+DLDAclassifier &lt;- dlda(t(measurementsVStrain[best10T, ]), classesTrain)
+testResult &lt;- predict(DLDAclassifier, t(measurementsVStest))
+DLDAclasses &lt;- testResult[[&quot;class&quot;]]
+DLDAconfusion &lt;- table(actual = classesTest, predicted = DLDAclasses)
+DLDAconfusion</code></pre>
+<pre><code>##            predicted
+## actual      Resistant Sensitive
+##   Resistant         7         8
+##   Sensitive        14        29</code></pre>
+<p>There are 36 samples correctly predicted and 22 samples incorrectly predicted.</p>
+</div>
+<div id="naive-bayes-classifier" class="section level2">
+<h2><span class="header-section-number">5.4</span> naive Bayes classifier</h2>
+<p>Again, feature selection is necessary. The 10 largest Kolmogorov-Smirnov test statistics will be used.</p>
+<pre class="r"><code>trainSensitive &lt;- measurementsVStrain[, classesTrain == &quot;Sensitive&quot;]
+trainResistant &lt;- measurementsVStrain[, classesTrain == &quot;Resistant&quot;]
+trainSensitive &lt;- as.list(as.data.frame(t(trainSensitive)))
+trainResistant &lt;- as.list(as.data.frame(t(trainResistant)))
+
+KS &lt;- mapply(function(sensValues, resValues)
+                      ks.test(sensValues, resValues)[[&quot;statistic&quot;]],
+             trainSensitive, trainResistant)
+best10KS &lt;- order(abs(KS), decreasing = TRUE)</code></pre>
+<p>An implementation of naive Bayes is provided by the R package e1071. The <code>naiveBayes</code> function trains the classifier and the <code>predict</code> function is used to make predictions on test data. It requires that the features be the columns of the table.</p>
+<pre class="r"><code>library(e1071)
+NBclassifier &lt;- naiveBayes(t(measurementsVStrain[best10KS, ]), classesTrain)
+NBclasses &lt;- predict(NBclassifier, t(measurementsVStest))
+NBconfusion &lt;- table(actual = classesTest, predicted = NBclasses)
+NBconfusion</code></pre>
+<pre><code>##            predicted
+## actual      Resistant Sensitive
+##   Resistant        12         3
+##   Sensitive        21        22</code></pre>
+<p>There are 34 samples correctly predicted and 24 samples incorrectly predicted.</p>
+</div>
+</div>
+<div id="after-the-break" class="section level1 unnumbered">
+<h1>After the Break</h1>
 <ul>
-<li>The <code>predictions</code> accessor gets all of the class predictions. View the first few predictions of the first permutation.<br> <strong>Hint</strong>: The predictions are stored in a list, one for each permutation and have as many rows as there are samples. Use <code>head</code> to limit the number of predictions displayed.</li>
+<li><p>Basic cross-validation</p></li>
+<li><p>Introduction to ClassifyR</p></li>
 </ul>
-<pre class="r"><code># Permutation 1
-head(predictions(classifiedDM)[[1]])</code></pre>
-<pre><code>##    sample     class
-## 1  GEO-96 Resistant
-## 2  GEO-84 Sensitive
-## 3 GEO-101 Sensitive
-## 4 GEO-152 Sensitive
-## 5  GEO-63 Resistant
-## 6 GEO-113 Sensitive</code></pre>
-<p>The <code>distribution</code> function calculates the feature selection frequency of all features. Use <code>?distribution</code> to find out about it and determine the most frequently selected feature.<br> <strong>Hint</strong>: Use the <code>sort function</code> on the output of the <code>distribution</code> function.</p>
-<div id="most-frequently-selected-feature" class="section level2">
-<h2><span class="header-section-number">6.1</span> Most Frequently Selected Feature</h2>
-<pre class="r"><code>frequencies &lt;- distribution(classifiedDM, plot = FALSE)
-frequencies &lt;- sort(frequencies, decreasing = TRUE)
-head(frequencies)</code></pre>
-<pre><code>## allFeatures
-##     BEND4     INHBA LOC728606      LSP1       LTK     CYYR1 
-##       100        83        77        69        66        65</code></pre>
-<p>BEND4 is chosen 100 out of 100 possible times.</p>
-<p>The distribution of gene expression per class can be quickly visualised with <code>plotFeatureClasses</code>.<br> <strong>Hint</strong>: The <code>targets</code> parameter of <code>plotFeatureClasses</code> specifies one or more features to be plotted.</p>
-<pre class="r"><code>plotFeatureClasses(measurementsVS, classes, targets = names(frequencies)[1],
-                   whichNumericPlots = &quot;density&quot;, xAxisLabel = &quot;RNA-seq Abundance&quot;)</code></pre>
-<p><img src="data:image/png;base64,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" width="672" style="display: block; margin: auto;" /></p>
-<p>The gene is visibly differentially expressed between resistant and sensitive patients.</p>
-</div>
-<div id="clinical-data-quality-check" class="section level2">
-<h2><span class="header-section-number">6.2</span> Clinical Data Quality Check</h2>
-<p>ZFY is a gene on the Y chromosome which only males have. Plot its expression with the gender in place of the treatment resistance classes.</p>
-<pre class="r"><code>plotFeatureClasses(measurementsVS, sampleInfo[, &quot;Gender&quot;], targets = &quot;ZFY&quot;,
-                   whichNumericPlots = &quot;density&quot;, xAxisLabel = &quot;RNA-seq Abundance&quot;)</code></pre>
-<p><img src="data:image/png;base64,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" width="672" style="display: block; margin: auto;" /></p>
-<p>The abundance grouped by gender is as expected.</p>
-</div>
-</div>
-<div id="logsitic-regression---dm-classifier-for-aml-resistance-using-clinical-data" class="section level1">
-<h1><span class="header-section-number">7</span> Logsitic Regression - DM Classifier for AML Resistance Using Clinical Data</h1>
-<ul>
-<li><p>Classifier built using only the routinely collected clinical information.</p></li>
-<li><p><em>Multinomial</em> logistic regression is not available by default in R, but is available from mnlogit.</p></li>
-<li><p><code>logisticRegressionTrainInterface</code> is a wrapper around the <code>mnlogit</code> fitting function.</p></li>
-<li><p><code>logisticRegressionPredictInterface</code> is a wrapper around the <code>predict</code> function for objects of class <code>mnlogit</code>.</p></li>
-</ul>
-<p>Specify the training and prediction parameter settings.<br> <strong>Hint</strong>: Use <code>?logisticRegressionTrainInterface</code> and note that it returns a vector of classes. Therefore, specify an identity function for <code>getClasses</code> to <code>PredictParams</code>.</p>
-<pre class="r"><code>trainParams &lt;- TrainParams(logisticRegressionTrainInterface)
-predictParams &lt;- PredictParams(logisticRegressionPredictInterface,
-                               getClasses = function(result) result)</code></pre>
-<p>Run 20 permutations and 5 folds cross-validation, ignoring GEO ID, Survival Time and Status.</p>
-<pre class="r"><code>ignoreColumns &lt;- match(c(&quot;ID&quot;, &quot;Survival Time&quot;, &quot;Status&quot;), colnames(sampleInfo))
-ignoreColumns</code></pre>
-<pre><code>## [1] 1 5 6</code></pre>
-<pre class="r"><code>classifiedClinical &lt;- runTests(DataFrame(sampleInfo[, -ignoreColumns]), &quot;Response&quot;,
-                               &quot;AML&quot;, &quot;Clinical&quot;,
-                               params = list(trainParams, predictParams),
-                               permutations = 20, seed = 2018)
-classifiedClinical</code></pre>
-<pre><code>## An object of class 'ClassifyResult'.
-## Data Set Name: AML.
-## Classification Name: Clinical.
-## Feature Selection Name: Unspecified.
-## Features: All used.
-## Validation: 20 Permutations, 5 Folds.
-## Predictions: List of data frames of length 20.
-## Performance Measures: None calculated yet.</code></pre>
-</div>
-<div id="naive-bayes---differential-distribution-dd-classifier-for-aml-resistance" class="section level1">
-<h1><span class="header-section-number">8</span> naive Bayes - Differential Distribution (DD) Classifier for AML Resistance</h1>
-<p>Numerous DD selection methods are available in ClassifyR. <a href="https://bioconductor.org/packages/release/bioc/vignettes/ClassifyR/inst/doc/ClassifyR.html#provided-feature-selection-and-classification-methods" target="_blank">Section 0.9 of the vignette</a> gives an overview. For this example, Kullback-Leibler divergence will be used. Navigate to the Reference Manual (PDF) of <a href="https://bioconductor.org/packages/release/bioc/html/ClassifyR.html" target="_blank">ClassifyR</a> to see the formula.</p>
-<p>Create a selection parameter object specifying the use of Kullback-Leibler feature selection.<br> <strong>Hint</strong>: <code>KullbackLeiblerSelection</code> is the name of the function to be specified. Information about the type of location and scale calculated is documented for <code>...</code></p>
-<pre class="r"><code>selectParams &lt;- SelectParams(KullbackLeiblerSelection,
-                             resubstituteParams = ResubstituteParams())</code></pre>
-<p>By default, the mean is the location and the standard deviation is the scale.</p>
-<p>A variety of DD classifiers are available in ClassifyR. For this example, the naive Bayes method will be used. The difference of the height (scaled by the number of samples in each class) between the kernel densities of the two classes is used by each gene to vote for one class. The class with the most votes is the predicted class of the patient.</p>
-<p>Create a training parameter object specifying the use of the naive Bayes classifier.</p>
-<pre class="r"><code>trainParams &lt;- TrainParams(naiveBayesKernel)</code></pre>
-<p>Create a prediction parameter object specifying the use the height difference between densities and unweighted voting. <code>naiveBayesKernel</code> trains a classifier and returns a factor vector of class predictions, so there is no other function used for predictions.<br> <strong>Hint</strong>: Use <code>?naiveBayesKernel</code> to see the names of the parameters controlling the voting process. Specify an identity function for <code>getClasses</code>.</p>
-<pre class="r"><code>predictParams &lt;- PredictParams(NULL, weighted = &quot;unweighted&quot;, weight = &quot;height difference&quot;,
-                               getClasses = function(result) result)</code></pre>
-<div id="dd-cross-validated-classification" class="section level2">
-<h2><span class="header-section-number">8.1</span> DD Cross-validated Classification</h2>
-<p>As was done for DM classification, 20 permutations and 5 fold cross-validation is done. It takes substantially longer to complete than DM classification, because thousands of kernel densities are being esimated for each iteration.</p>
-<pre class="r"><code>classifiedDD &lt;- runTests(measurementsVS, classes, &quot;AML&quot;, &quot;Changes in Distributions&quot;,
-                         params = list(selectParams, trainParams, predictParams),
-                         permutations = 20, seed = 2018)
-classifiedDD</code></pre>
-<pre><code>## An object of class 'ClassifyResult'.
-## Data Set Name: AML.
-## Classification Name: Changes in Distributions.
-## Feature Selection Name: Kullback-Leibler Divergence.
-## Features: List of length 20 of lists of length 5 of feature identifiers.
-## Validation: 20 Permutations, 5 Folds.
-## Predictions: List of data frames of length 20.
-## Performance Measures: None calculated yet.</code></pre>
-<p>Evaluation of these three classifiers will be made in the subsequent tutorial.</p>
-</div>
 </div>
 
 
