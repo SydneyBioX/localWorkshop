@@ -15,11 +15,8 @@ Before attending the workshop, ensure R is at least version 3.5.0 and install Cl
 install("ClassifyR", dependencies = TRUE)
 ```
 
-Additionally, DESeq2 and EDASeq are used for some exploratory visualisations. They can be installed by running the command
+Additionally, DESeq2, EDASeq and genefilter are used for some exploratory visualisations and analysis. They can be installed by running the command
 
 ```
-install(c("DESeq2", "EDASeq"))
+install(c("DESeq2", "EDASeq", "genefilter"))
 ```
-
-Also, dowload the two data files `counts.txt` and `samples.txt` stored in the `data` directory. The easiest way to get them is to download the whole repository by clicking on the Clone or Download button in the top-right corner of the GitHub web page of the workshop and download a ZIP file.
-
