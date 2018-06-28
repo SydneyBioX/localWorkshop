@@ -17,7 +17,7 @@ editor_options:
 
 ```{r, echo = FALSE}
 library(knitr)
-knitr::opts_chunk$set(echo = TRUE, cache = TRUE, results='hide')
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, results='hide', fig.show="hide", message = FALSE, warning = FALSE)
 #opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
 options(width = 91)
 ```
@@ -297,9 +297,54 @@ classesTrain <- classes[1:135]
 classesTest <- classes[126:235]
 ```
 
+
+## Feature Selection
+
+For many classification methods, it helps to input only genes which you feel will be useful for the prediction; including non-informative genes could introduce noise or facilitate over-fitting. For many of the following methods, we will use the 10 largest absolute t-statistics. The `rowttests` function enables thousands of t-tests to be calculated quickly. The 10 best features are chosen for illustration; this number should more generally be determined in a thoughtful way.
+
+
+```{r, message = FALSE}
+library(genefilter)
+tStatistic <- rowttests(geneTrain, classesTrain)[["statistic"]]
+best10T <- order(abs(tStatistic), decreasing = TRUE)[1:10]
+```
+
+
+## Diagonal Linear Discriminant Analysis (DLDA)
+
+
+An implementation of DLDA is provided by the R package sparsediscrim. The `dlda` function trains the classifier and the `predict` function is used to make predictions on test data. It requires that the features be the columns of the table. We will use the top 10 most differentially expressed genes in the model.
+
+
+```{r}
+
+library(sparsediscrim)
+
+# Build DLDA classifier
+DLDAclassifier <- dlda(t(geneTrain[best10T, ]), classesTrain)
+
+# Use the classifier to predict classes of some new samples
+testResult <- predict(DLDAclassifier, t(geneTest))
+DLDAclasses <- testResult[["class"]]
+
+# Calculate confusion matrix
+DLDAconfusion <- table(actual = classesTest, predicted = DLDAclasses)
+DLDAconfusion
+
+# Calculate accuracy as the number of predictions the model got correct
+sum(diag(DLDAconfusion))/sum(DLDAconfusion)
+
+```
+
+There are `r sum(diag(DLDAconfusion))` samples correctly predicted and `r sum(DLDAconfusion) - sum(diag(DLDAconfusion))` samples incorrectly predicted.
+
+
+
 ## Logistic Regression 
 
-This technique is useful for classifying the clinical data as it works seamlessly with numeric and categorical data. R's `glm` function can build such a classifier if there are exactly 2 classes of samples. The `predict` function is used to make predictions for the test set samples. The option `type = "response"` specifies that probabilities should be calculated. There's no option to output class labels directly.
+### Logistic Regression on clinical data
+
+Logistic regression is a well established statistical method for performing classification. This technique is useful for classifying the clinical data as it works seamlessly with numeric and categorical data. R's `glm` function can build such a classifier if there are exactly 2 classes of samples. The `predict` function is used to make predictions for the test set samples. The option `type = "response"` specifies that probabilities should be calculated. There's no option to output class labels directly.
 
 RUNX1-RUNX1T1 Fusion is rare and removed from the analysis because it only happens for 3 people. Every factor variable in the input table for logistic regression must have at least one observation in each class.
 
@@ -337,43 +382,8 @@ summary(LRclassifier)
 ```
 
 
-
+### Logistic Regression on gene expression data 
 We could also use logistic regression with the gene expression data.
-
-
-```{r}
-
-X = as.data.frame(t(geneTrain))
-y = clinicalTrain$Response
-newX = as.data.frame(t(geneTest))
-
-# Perform logistic regression 
-LRclassifierGene <- glm(y ~ ., data = X,family =  "binomial")
-
-# Predict classes by probability > 0.5
-LRprobabilitiesGene <- predict(LRclassifierGene, newX , type = "response")
-LRclassesGene <- ifelse(LRprobabilities > 0.5, levels(classes)[2], levels(classes)[1])
-
-# Calculate confusion matrix. 
-LRconfusionGene <- table(actual = classesTest, predicted = LRclassesGene)
-LRconfusionGene
-
-# Calculate accuracy as the number of predictions the model got correct
-
-sum(diag(LRconfusionGene))/sum(LRconfusionGene)
-
-
-```
-
-
-Gene features should be chosen as the classifier performs slowly and badly if many uninformative features are present in the input table. The 10 largest absolute t-statistics will be used. `rowttests` function enables thousands of t-tests to be calculated quickly. The 10 best features are chosen for illustration; this number should be determined in a thoughtful way.
-
-
-```{r, message = FALSE}
-library(genefilter)
-tStatistic <- rowttests(geneTrain, classesTrain)[["statistic"]]
-best10T <- order(abs(tStatistic), decreasing = TRUE)[1:10]
-```
 
 
 
@@ -384,57 +394,31 @@ y = clinicalTrain$Response
 newX = as.data.frame(t(geneTest))
 
 # Perform logistic regression 
-LRclassifierGeneBest10 <- glm(y ~ ., data = X,family =  "binomial")
-LRprobabilitiesGeneBest10 <- predict(LRclassifierGeneBest10, newX , type = "response")
+LRclassifierGene <- glm(y ~ ., data = X,family =  "binomial")
+LRprobabilitiesGene <- predict(LRclassifierGene, newX , type = "response")
 
 # Predict classes by probs > 0.5
-LRclassesGeneBest10 <- ifelse(LRprobabilitiesGeneBest10 > 0.5, levels(classes)[2], levels(classes)[1])
+LRclassesGene <- ifelse(LRprobabilitiesGene > 0.5, levels(classes)[2], levels(classes)[1])
 
 # Calculate confusion matrix. 
-LRconfusionGeneBest10 <- table(actual = classesTest, predicted = LRclassesGeneBest10)
-LRconfusionGeneBest10
+LRconfusionGene <- table(actual = classesTest, predicted = LRclassesGene)
+LRconfusionGene
 
 # Calculate accuracy as the number of predictions the model got correct
 
-sum(diag(LRconfusionGeneBest10))/sum(LRconfusionGeneBest10)
+sum(diag(LRconfusionGene))/sum(LRconfusionGene)
 
 # Which genes appear to be contributing the most to the model?
 
-summary(LRclassifierGeneBest10)
+summary(LRclassifierGene)
 
 
 ```
 
+## Support Vector Machines (SVM)
 
 
-
-
-## Diagnonal Linear Discriminant Analysis (DLDA)
-
-
-An implementation of DLDA is provided by the R package sparsediscrim. The `dlda` function trains the classifier and the `predict` function is used to make predictions on test data. It requires that the features be the columns of the table. We will again use the top 10 most differentially expressed genes.
-
-```{r}
-
-library(sparsediscrim)
-
-# Build DLDA classifier
-DLDAclassifier <- dlda(t(geneTrain[best10T, ]), classesTrain)
-
-# Use the classifier to predict classes of some new samples
-testResult <- predict(DLDAclassifier, t(geneTest))
-DLDAclasses <- testResult[["class"]]
-
-# Calculate confusion matrix
-DLDAconfusion <- table(actual = classesTest, predicted = DLDAclasses)
-DLDAconfusion
-
-# Calculate accuracy as the number of predictions the model got correct
-sum(diag(DLDAconfusion))/sum(DLDAconfusion)
-
-```
-
-There are `r sum(diag(DLDAconfusion))` samples correctly predicted and `r sum(DLDAconfusion) - sum(diag(DLDAconfusion))` samples incorrectly predicted.
+## Random Forests
 
 ## naive Bayes classifier
 
