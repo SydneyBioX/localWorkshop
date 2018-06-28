@@ -1,6 +1,6 @@
 ---
 title: "Selecting Biomarkers and Making Predictions"
-author: "Ellis Patrick"
+author: "Dario Strbenac"
 date: "29 June 2018"
 output:
   html_document:
@@ -27,9 +27,31 @@ options(width = 91)
 
 - Fitting widely used classifiers to a simple partition of the data set
 
+# Preparation
+
+To complete todays workshops you will need to have R and Rstudio installed on your computer. Please see README file for more information. 
+
+You should create a directory for todays workshop to save all of your work.  
+
+You should open a new rmarkdown (Rmd) document. You will write all of your code here.
+
+You will also need to install the following R packages.
+
+```{r}
+source("https://bioconductor.org/biocLite.R")
+biocLite("ClassifyR")
+biocLite("DESeq2")
+biocLite("EDASeq")
+biocLite("genefilter")
+install.packages('tidyverse')
+install.packages('sparsediscrim')
+install.packages('e1071')
+```
+
+
 # RNA-seq Data Set: Acute Myeloid Leukaemia (AML) Treatment Resistance
 
-- Primary therapy resistance is a major problem in acute myeloid leukemia treatment. Approximately 20–30% of younger adult patients with AML and as many as 50% of older adults are refractory to induction treatment.
+- Primary therapy resistance is a major problem in acute myeloid leukemia treatment. Approximately 20-30% of younger adult patients with AML and as many as 50% of older adults are refractory to induction treatment.
 
 - Research findings are <a href="http://www.haematologica.org/content/103/3/456" target="_blank">published</a> in *Haematologica* in 2018.
 
@@ -49,40 +71,6 @@ sampleInfo <- read.delim(url("https://raw.githubusercontent.com/SydneyBioX/local
 
 `check.names = FALSE` prevents R unnecessarily changing hyphens and spaces in column names to periods.
 
-## Download and Format Tables From GEO
-
-Observe that the process is not streamlined, but do not run the code.
-
-```{r, eval = FALSE}
-library(GEOquery)
-library(tools)
-
-clinical <- pData(getGEO("GSE106291")[[1]])
-keepColumns <- c("title", "characteristics_ch1.2", "characteristics_ch1.3",
-                 "characteristics_ch1.4", "characteristics_ch1.5",
-                 "characteristics_ch1.6", "characteristics_ch1.8",
-                 "characteristics_ch1.9")
-clinical <- clinical[, keepColumns]
-colnames(clinical) <- c("ID", "Gender", "Age", "Response", "Survival Time", "Status",
-                        "RUNX1-RUNX1T1 Fusion", "RUNX1 Mutation")
-clinical <- data.frame(lapply(clinical, as.character),
-                       check.names = FALSE, stringsAsFactors = FALSE)
-removedColumnNames <- lapply(clinical, function(dataColumn)
-                             toTitleCase(gsub(".*: ", '', dataColumn)))
-clinical <- data.frame(removedColumnNames, check.names = FALSE)
-
-library(readr)
-tempFile <- file.path(tempdir(), "countsPack.tar")
-download.file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE106291&format=file",
-              destfile = tempFile)
-untar(tempFile, exdir = dirname(tempFile))
-countsFiles <- list.files(dirname(tempFile), "^GSM", full.names = TRUE)
-sampleCounts <- lapply(countsFiles, function(file)
-                       read_delim(file, '\t', col_names = FALSE))
-countsMatrix <- do.call(cbind, lapply(sampleCounts, "[[", 2))
-rownames(countsMatrix) <- sampleCounts[[1]][[1]]
-colnames(countsMatrix) <- sapply(strsplit(basename(countsFiles), '_'), '[', 2)
-```
 
 ## The Clinical Data
 
@@ -116,6 +104,43 @@ sampleInfo <-sampleInfo[, -ignoreClinical]
 ```
 
 
+## Extension: Download and Format Tables From GEO
+
+Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. Previously there were very clean and standardised ways to load data from GEO into R, however this is now often not the case. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.
+
+```{r, eval = FALSE}
+library(GEOquery)
+library(tools)
+
+clinical <- pData(getGEO("GSE106291")[[1]])
+keepColumns <- c("title", "characteristics_ch1.2", "characteristics_ch1.3",
+                 "characteristics_ch1.4", "characteristics_ch1.5",
+                 "characteristics_ch1.6", "characteristics_ch1.8",
+                 "characteristics_ch1.9")
+clinical <- clinical[, keepColumns]
+colnames(clinical) <- c("ID", "Gender", "Age", "Response", "Survival Time", "Status",
+                        "RUNX1-RUNX1T1 Fusion", "RUNX1 Mutation")
+clinical <- data.frame(lapply(clinical, as.character),
+                       check.names = FALSE, stringsAsFactors = FALSE)
+removedColumnNames <- lapply(clinical, function(dataColumn)
+                             toTitleCase(gsub(".*: ", '', dataColumn)))
+clinical <- data.frame(removedColumnNames, check.names = FALSE)
+
+library(readr)
+tempFile <- file.path(tempdir(), "countsPack.tar")
+download.file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE106291&format=file",
+              destfile = tempFile)
+untar(tempFile, exdir = dirname(tempFile))
+countsFiles <- list.files(dirname(tempFile), "^GSM", full.names = TRUE)
+sampleCounts <- lapply(countsFiles, function(file)
+                       read_delim(file, '\t', col_names = FALSE))
+countsMatrix <- do.call(cbind, lapply(sampleCounts, "[[", 2))
+rownames(countsMatrix) <- sampleCounts[[1]][[1]]
+colnames(countsMatrix) <- sapply(strsplit(basename(countsFiles), '_'), '[', 2)
+```
+
+
+
 # Properties of RNA-seq Measurements
 
 RNA-seq count tables have a couple of properties which need to be accounted for.
@@ -123,6 +148,33 @@ RNA-seq count tables have a couple of properties which need to be accounted for.
 1. Different samples may have a different total number of reads. A particular sample with 10 million reads will have 0 reads counted for genes that will have non-zero counts if the same sample had 100 million reads.
 
 2. The variance of counts increases as the mean count increases when considering the trend based on all of the genes. Most classifiers require that the input data set have a constant variance across the range of means.
+
+We will use the R package DESeq2 to transform our data to account for these to issues. This will follow many of the steps in the DESeq2 vignette https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html .
+
+## Load counts into DESeq2 format
+
+To use DESeq2 to transform our data, we will need to load it into a DESeq2 object.
+```{r}
+
+library("DESeq2")
+
+# Convert our counts into a DESeqDataSet
+
+dds <- DESeqDataSetFromMatrix(countData = readCounts,
+                              colData = data.frame(colNames = colnames(readCounts)),
+                              design = ~ 1)
+
+```
+
+
+While not necessary, we will remove all genes with zero counts in 200 or more samples.<br>
+We will use `==` to test for zeros.
+
+```{r}
+keep <- rowSums(counts(dds) == 0) < 200
+dds <- dds[keep,]
+```
+
 
 ## Read Total / Library Size Differences
 
@@ -134,62 +186,34 @@ readCounts[1:5, 1:5]
 dim(readCounts)
 ```
 
-For the later classifcation exercises, the number of samples will be reduced to reduce the running time. The number of reads per sample varies widely betwen patients by as much as 10-fold.
+The number of reads per sample varies widely betwen patients by as much as 10-fold.
 
 ```{r}
-samplesCounts <- colSums(readCounts)
+samplesCounts <- colSums(counts(dds))
 countsSummary <- summary(samplesCounts)
 countsSummary
 ```
 
-The limit of detection would be quite different between samples.
-
-Remove all genes with zero counts in 200 or more samples.<br>
-**Hint**: Use `apply` to process each row and use `==` to test for zeros.
-
-```{r}
-removeGenes <- apply(readCounts, 1, function(geneCounts) sum(geneCounts == 0) > 200)
-readCounts <- readCounts[!removeGenes, ]
-```
-
-For a visual representation, a boxplot is used to show the differences in gene counts of the first 50 samples which are simply in lexical order. The boxplots would all have been at zero if the zero rows weren't removed in the previous task, which constitute a large part of the count table.
+The limit of detection would be quite different between samples. We can also visualise this with a boxplot where we see that the distribution of gene expression values of each sample look quite different.
 
 ```{r, fig.height = 6, fig.width = 12}
-boxplot(readCounts[, 1:50], ylim = c(0, 1500),
-        main = "Gene Counts", ylab = "Count", cex = 0.25, xaxt = 'n')
+boxplot(counts(dds)[, 1:50], ylim = c(0, 1500),
+        main = "Gene Counts", ylab = "Counts", cex = 0.25, xaxt = 'n')
 ```
 
-Identify in which columns of the matrix patients with less than the first quartile of counted reads and more than the third quartile are to remove them from the analysis.
+
+We can alleviate this issue by scaling each column to have a similar number of counts. We will do this using the normalization procedure in DESeq2 `estimateSizeFactors`.
+
 
 ```{r}
-removeRNA <- which(samplesCounts < countsSummary["1st Qu."] |
-                   samplesCounts > countsSummary["3rd Qu."])
-readCounts <- readCounts[, -removeRNA]
-sampleInfo <- sampleInfo[-removeRNA, ]
+dds <- estimateSizeFactors(dds)
 ```
 
-Calculate the number of remanining samples belonging to each class.
-
-```{r}
-classes <- sampleInfo[, "Response"]
-table(classes)
-```
-
-The classification task is moderately imbalanced.
-
-Scale each sample's counts to be the same as the sample in the first column.<br>
-**Hint**: Calculate the ratio of each column's sum of counts to the first column's sum of counts. Then, multiply the counts in each column by that scaling factor.
-
-```{r}
-scaleFactors <- colSums(readCounts)[1] / colSums(readCounts)
-scaledCounts <- t(t(readCounts) * scaleFactors)
-```
-
-Note how the disributions of counts per patient are now quite similar.
+Note how the disributions of counts per patient are now much more similar.
 
 ```{r, fig.height = 6, fig.width = 12}
-boxplot(scaledCounts[, 1:50], ylim = c(0, 1500),
-        main = "Gene Counts", ylab = "Scaled Count", cex = 0.25, xaxt = 'n')
+boxplot(counts(dds, normalize=TRUE)[, 1:50], ylim = c(0, 1500),
+        main = "Gene Counts", ylab = "Scaled Counts", cex = 0.25, xaxt = 'n')
 ```
 
 ## Increasing Mean and Variance
