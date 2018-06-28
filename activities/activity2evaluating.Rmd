@@ -20,13 +20,70 @@ opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
 
 # Activity Overview
 
-- Feature selection stability.
+- Cross-validation laid bare
 
-- Evaluation of overall error, sample-specific error, precision, recall.
+- Introducing ClassifyR
 
-- Comparison of various classifiers.
+- Feature selection stability
 
-# ClassifyR
+- Evaluation of overall error, sample-specific error, precision, recall
+
+- Comparison of various classifiers
+
+# Cross-validation Laid Bare
+
+- Feature selection must be done inside the cross-validation loop to be fair.
+
+20 sample permutation and 5 folds cross-validation of moderated t-test selection and a DLDA classifier is demonstrated. Doing this manually is time-consuming and difficult. There is no need to run the code below, but appreciate the complexity of it and the many possibilities for making errors.
+
+```{r, eval = FALSE}
+sampleOrdering <- lapply(1:20, function(permutation) sample(ncol(measurements)))
+sampleFold <- rep(1:5, length.out = ncol(measurements))
+samplesFolds <- lapply(sampleOrdering, function(sample) split(sample, sampleFold))
+library(limma)
+library(sparsediscrim)
+
+results <- lapply(1:20, function(permuteIndex)
+{
+  lapply(1:5, function(foldIndex)
+  {
+    # Subsetting of measurements and classes for training and test sets
+    testIndices <- samplesFolds[[permuteIndex]][[foldIndex]]
+    trainingValues <- measurementsVS[, -testIndices]
+    trainingClasses <- classes[-testIndices]
+    testingValues <- measurementsVS[, testIndices]
+    testClasses <- classes[testIndices]
+    
+    # Ranking by moderated t-test
+    linearModel <- lmFit(trainingValues, model.matrix(~ trainingClasses))
+    linearModel <- eBayes(linearModel)
+    topFeatures <- topTable(linearModel, coef = 2, number = Inf, sort.by = "p")
+    topIndices <- match(rownames(topFeatures), rownames(measurementsVS))
+    
+    # Picking the best top-p features based on resubstitition error.
+    resubErrors <- numeric()
+    topTry <- seq(10, 100, 10)
+    resubErrors <- lapply(topTry, function(topF)
+    {
+      trained <- dlda(t(trainingValues)[, topIndices[1:topF]], trainingClasses)
+      predicted <- predict(trained, t(trainingValues)[, topIndices[1:topF]])[["class"]]
+      sum(predicted != trainingClasses)
+    })
+    topF <- topTry[which.min(resubErrors)[1]] # Smallest in case of ties.
+    
+    # Training and prediction.
+    useFeatures <- rownames(measurementsVS)[topIndices[1:topF]]
+    trained <- dlda(t(trainingValues)[, useFeatures], trainingClasses)
+    predicted <- predict(trained, t(testingValues)[, useFeatures])
+    
+    list(chosen = useFeatures,
+         predictions = data.frame(ID = colnames(testingValues),
+                                  class = predicted[["class"]]))
+  })
+})
+```
+
+# ClassifyR Framework
 
 - A *framework* for feature selection, cross-validated classification and its performance evaluation.
 
@@ -88,54 +145,7 @@ classifiedDM <- runTests(measurementsVS, classes, "AML", "Changes in Means",
 classifiedDM
 ```
 
-Doing this manually would be time consuming and difficult. The same classification written using simple R statements is long and there are many opportunities for introducing errors. There is no need to run it, but appreciate the complexity of the code.
-
-```{r, eval = FALSE}
-sampleOrdering <- lapply(1:20, function(permutation) sample(ncol(measurements)))
-sampleFold <- rep(1:5, length.out = ncol(measurements))
-samplesFolds <- lapply(sampleOrdering, function(sample) split(sample, sampleFold))
-library(limma)
-library(sparsediscrim)
-
-results <- lapply(1:20, function(permuteIndex)
-{
-  lapply(1:5, function(foldIndex)
-  {
-    # Subsetting of measurements and classes for training and test sets
-    testIndices <- samplesFolds[[permuteIndex]][[foldIndex]]
-    trainingValues <- measurementsVS[, -testIndices]
-    trainingClasses <- classes[-testIndices]
-    testingValues <- measurementsVS[, testIndices]
-    testClasses <- classes[testIndices]
-    
-    # Ranking by moderated t-test
-    linearModel <- lmFit(trainingValues, model.matrix(~ trainingClasses))
-    linearModel <- eBayes(linearModel)
-    topFeatures <- topTable(linearModel, coef = 2, number = Inf, sort.by = "p")
-    topIndices <- match(rownames(topFeatures), rownames(measurementsVS))
-    
-    # Picking the best top-p features based on resubstitition error.
-    resubErrors <- numeric()
-    topTry <- seq(10, 100, 10)
-    resubErrors <- lapply(topTry, function(topF)
-    {
-      trained <- dlda(t(trainingValues)[, topIndices[1:topF]], trainingClasses)
-      predicted <- predict(trained, t(trainingValues)[, topIndices[1:topF]])[["class"]]
-      sum(predicted != trainingClasses)
-    })
-    topF <- topTry[which.min(resubErrors)[1]] # Smallest in case of ties.
-    
-    # Training and prediction.
-    useFeatures <- rownames(measurementsVS)[topIndices[1:topF]]
-    trained <- dlda(t(trainingValues)[, useFeatures], trainingClasses)
-    predicted <- predict(trained, t(testingValues)[, useFeatures])
-    
-    list(chosen = useFeatures,
-         predictions = data.frame(ID = colnames(testingValues),
-                                  class = predicted[["class"]]))
-  })
-})
-```
+Note how much simpler this is than the large code segment shown earlier.
 
 - Access the chosen features by using the `features` accessor, which extracts all of the feature selections at each iteration of cross-validation. View the features chosen in folds 1 and 2 of permutation 1.<br>
 **Hint**: The features are in a list of lists. The top-level list contains one element for each iteration and the second-level list contains one element for each fold.
@@ -207,12 +217,10 @@ predictParams <- PredictParams(logisticRegressionPredictInterface,
                                getClasses = function(result) result)
 ```
 
-Run 20 permutations and 5 folds cross-validation, ignoring GEO ID, Survival Time and Status.
+Run 20 permutations and 5 folds cross-validation.
 
 ```{r}
-ignoreColumns <- match(c("ID", "Survival Time", "Status"), colnames(sampleInfo))
-ignoreColumns
-classifiedClinical <- runTests(DataFrame(sampleInfo[, -ignoreColumns]), "Response",
+classifiedClinical <- runTests(DataFrame(sampleInfo), "Response",
                                "AML", "Clinical",
                                params = list(trainParams, predictParams),
                                permutations = 20, seed = 2018)
@@ -273,11 +281,6 @@ Evaluation of these three classifiers will be made in the subsequent tutorial.
 -  For 20 permutations and 5 folds, there are $^{100}C_2 = 4950$ overlaps to compute. Like `runTests`, `selectionPlot` may utilise multiple processors.
 
 Plot the distribution of overlaps of selected features of the DM and DD classifiers.
-
-```{r, message = FALSE, echo = FALSE}
-library(ClassifyR)
-load("data/classified.RData")
-```
 
 ```{r, fig.align = "center", fig.width = 10, fig.height = 3}
 withinChoices <- selectionPlot(list(classifiedDM, classifiedDD),
@@ -364,7 +367,6 @@ errorPlot <- performancePlot(list(classifiedDM, classifiedDD, classifiedClinical
                              boxFillColouring = "None", boxLineColouring = "None",
                              columnVariable = "None", title = "Balanced Errors",
                              xLabel = "Classifier", rotate90 = TRUE, plot = FALSE)
-library(ggplot2)
 errorPlot + geom_hline(yintercept = 0.5, colour = "red")
 ```
 
