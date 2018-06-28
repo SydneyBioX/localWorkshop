@@ -4,19 +4,22 @@ author: "Dario Strbenac"
 date: "29 June 2018"
 output:
   html_document:
-    code_folding: hide
+    code_folding: show
     number_sections: yes
     self_contained: yes
     toc: true
     toc_float: true
-    toc_depth: 1
-    theme: yeti
+    toc_depth: 3
+    theme: spacelab
+    include:
+      after_body: stylesDD.js
 editor_options: 
   chunk_output_type: console
 ---
 
 ```{r, echo = FALSE}
 library(knitr)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, results='hide')
 #opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
 options(width = 91)
 ```
@@ -33,21 +36,23 @@ options(width = 91)
 
 To complete todays workshops you will need to have R and Rstudio installed on your computer. Please see README file for more information. 
 
-You should create a directory for todays workshop to save all of your work.  
+To install Bioconductor software, BiocManager must firstly be obtained from CRAN.
 
-You should open a new rmarkdown (Rmd) document. You will write all of your code here.
+```
+install.packages("BiocManager")
+library(BiocManager)
+```
 
-You will also need to install the following R packages.
+Before attending the workshop, ensure R is at least version 3.5.0 and install ClassifyR using
 
-```{r eval=FALSE}
-source("https://bioconductor.org/biocLite.R")
-biocLite("ClassifyR")
-biocLite("DESeq2")
-biocLite("vsn")
-biocLite("genefilter")
-install.packages('tidyverse')
-install.packages('sparsediscrim')
-install.packages('e1071')
+```
+install("ClassifyR", dependencies = TRUE)
+```
+
+Additionally, DESeq2, EDASeq and genefilter are used for some exploratory visualisations and analysis. They can be installed by running the command
+
+```
+install(c("DESeq2", "EDASeq", "genefilter"))
 ```
 
 
@@ -59,11 +64,11 @@ install.packages('e1071')
 
 - The data is available from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106291" target="_blank">GEO Browser</a> as 250 `txt.gz` files of gene-level read counts or a Microsoft Excel file where the gene expression values were standardised to have a mean of 0 and variance of 1.
 
-# Data Import and Exploration {.tabset .tabset-fade .tabset-pills}
+### Import Prepared Files From GitHub 
 
 Importing RNA-seq data from GEO Browser into R is a difficult process. Import the prepared tab-separated text files of RNA-seq read counts and clinical data from GitHub.
 
-## Import Prepared Files From GitHub 
+
 
 ```{r}
 readCounts <- read.delim(url("https://raw.githubusercontent.com/SydneyBioX/localWorkshop/master/data/counts.txt"), check.names = FALSE)
@@ -74,7 +79,7 @@ sampleInfo <- read.delim(url("https://raw.githubusercontent.com/SydneyBioX/local
 `check.names = FALSE` prevents R unnecessarily changing hyphens and spaces in column names to periods.
 
 
-## The Clinical Data
+## Explore the Clinical Data
 
 The clinical data provides information about several different characteristics of the patients. Verify that there is data for 250 patients.<br>
 **Hint**: `sampleInfo` is a `data.frame`. Each row stores data for one patient.
@@ -101,7 +106,7 @@ sampleInfo <- sampleInfo[-removeClinical, ]
 Remove outcome variables other than Response from the clinical table.
 
 ```{r}
-ignoreClinical <- match(c("ID", "Status", "Survival Time"), colnames(sampleInfo))
+ignoreClinical <- match(c("Status", "Survival Time"), colnames(sampleInfo))
 sampleInfo <-sampleInfo[, -ignoreClinical]
 ```
 
@@ -142,8 +147,9 @@ colnames(countsMatrix) <- sapply(strsplit(basename(countsFiles), '_'), '[', 2)
 ```
 
 
+# Processing RNA-Seq data 
 
-# Properties of RNA-seq Measurements
+## Properties of RNA-seq Measurements 
 
 RNA-seq count tables have a couple of properties which need to be accounted for.
 
@@ -156,9 +162,9 @@ We will use the R package DESeq2 to transform our data to account for these to i
 ## Load counts into DESeq2 format
 
 To use DESeq2 to transform our data, we will need to load it into a DESeq2 object.
-```{r}
+```{r message=FALSE}
 
-library("DESeq2")
+library(DESeq2)
 
 # Convert our counts into a DESeqDataSet
 
@@ -243,7 +249,6 @@ Most classifiers require that the input data set have a constant variance across
 
 
 ```{r, warning = FALSE}
-library(DESeq2)
 dds <- estimateDispersions(dds)
 measurementsVS <- assay(vst(dds))
 ```
@@ -273,20 +278,28 @@ Class information is not used, so the filtering is fair. The most variable gene 
 
 Before the ClassifyR framework is used, simple illustrative classifications using three classifiers are done.
 
+Calculate the number of samples belonging to each class.
+
+```{r}
+classes <- sampleInfo[, "Response"]
+table(classes)
+```
+
+
 ## Training and Test Sets
 
 Split the samples into a training set and a test set.
 
 ```{r}
-measurementsVStrain <- measurementsVS[, 1:59]
-measurementsVStest <- measurementsVS[, 60:117]
-clinicalTrain <- sampleInfo[1:59, ]
-clinicalTest <- sampleInfo[60:117, ]
-classesTrain <- classes[1:59]
-classesTest <- classes[60:117]
+geneTrain <- measurementsVS[, 1:135]
+geneTest <- measurementsVS[, 126:235]
+clinicalTrain <- sampleInfo[1:135, ]
+clinicalTest <- sampleInfo[126:235, ]
+classesTrain <- classes[1:135]
+classesTest <- classes[126:235]
 ```
 
-## Logistic Regression
+## Logistic Regression 
 
 This technique is useful for classifying the clinical data as it works seamlessly with numeric and categorical data. R's `glm` function can build such a classifier if there are exactly 2 classes of samples. The `predict` function is used to make predictions for the test set samples. The option `type = "response"` specifies that probabilities should be calculated. There's no option to output class labels directly.
 
@@ -294,34 +307,133 @@ RUNX1-RUNX1T1 Fusion is rare and removed from the analysis because it only happe
 
 ```{r}
 fusionColumn <- match("RUNX1-RUNX1T1 Fusion", colnames(clinicalTrain))
+
+# Perform logistic regression 
 LRclassifier <- glm(Response ~ ., "binomial", clinicalTrain[, -fusionColumn])
+
+# Predict classes by probability > 0.5
 LRprobabilities <- predict(LRclassifier, clinicalTest[, -fusionColumn], type = "response")
 LRclasses <- ifelse(LRprobabilities > 0.5, levels(classes)[2], levels(classes)[1])
+
+
+# Calculate confusion matrix. 
 LRconfusion <- table(actual = classesTest, predicted = LRclasses)
 LRconfusion
+
+
+
+# Calculate accuracy as the number of predictions the model got correct
+sum(diag(LRconfusion))/sum(LRconfusion)
+
 ```
 
 There are `r sum(diag(LRconfusion))` samples correctly predicted and `r sum(LRconfusion) - sum(diag(LRconfusion))` samples incorrectly predicted.
 
-## Diagnonal Linear Discriminant Analysis (DLDA)
+<br>
+
+By looking at which variables were significant in the model, we may get an intuition for which variables are important. Here we see age as important.
+
+
+```{r}
+summary(LRclassifier)
+```
+
+
+
+We could also use logistic regression with the gene expression data.
+
+
+```{r}
+
+X = as.data.frame(t(geneTrain))
+y = clinicalTrain$Response
+newX = as.data.frame(t(geneTest))
+
+# Perform logistic regression 
+LRclassifierGene <- glm(y ~ ., data = X,family =  "binomial")
+
+# Predict classes by probability > 0.5
+LRprobabilitiesGene <- predict(LRclassifierGene, newX , type = "response")
+LRclassesGene <- ifelse(LRprobabilities > 0.5, levels(classes)[2], levels(classes)[1])
+
+# Calculate confusion matrix. 
+LRconfusionGene <- table(actual = classesTest, predicted = LRclassesGene)
+LRconfusionGene
+
+# Calculate accuracy as the number of predictions the model got correct
+
+sum(diag(LRconfusionGene))/sum(LRconfusionGene)
+
+
+```
+
 
 Gene features should be chosen as the classifier performs slowly and badly if many uninformative features are present in the input table. The 10 largest absolute t-statistics will be used. `rowttests` function enables thousands of t-tests to be calculated quickly. The 10 best features are chosen for illustration; this number should be determined in a thoughtful way.
 
+
 ```{r, message = FALSE}
 library(genefilter)
-tStatistic <- rowttests(measurementsVStrain, classesTrain)[["statistic"]]
-best10T <- order(abs(tStatistic), decreasing = TRUE)
+tStatistic <- rowttests(geneTrain, classesTrain)[["statistic"]]
+best10T <- order(abs(tStatistic), decreasing = TRUE)[1:10]
 ```
 
-An implementation of DLDA is provided by the R package sparsediscrim. The `dlda` function trains the classifier and the `predict` function is used to make predictions on test data. It requires that the features be the columns of the table.
+
 
 ```{r}
+
+X = as.data.frame(t(geneTrain[best10T,]))
+y = clinicalTrain$Response
+newX = as.data.frame(t(geneTest))
+
+# Perform logistic regression 
+LRclassifierGeneBest10 <- glm(y ~ ., data = X,family =  "binomial")
+LRprobabilitiesGeneBest10 <- predict(LRclassifierGeneBest10, newX , type = "response")
+
+# Predict classes by probs > 0.5
+LRclassesGeneBest10 <- ifelse(LRprobabilitiesGeneBest10 > 0.5, levels(classes)[2], levels(classes)[1])
+
+# Calculate confusion matrix. 
+LRconfusionGeneBest10 <- table(actual = classesTest, predicted = LRclassesGeneBest10)
+LRconfusionGeneBest10
+
+# Calculate accuracy as the number of predictions the model got correct
+
+sum(diag(LRconfusionGeneBest10))/sum(LRconfusionGeneBest10)
+
+# Which genes appear to be contributing the most to the model?
+
+summary(LRclassifierGeneBest10)
+
+
+```
+
+
+
+
+
+## Diagnonal Linear Discriminant Analysis (DLDA)
+
+
+An implementation of DLDA is provided by the R package sparsediscrim. The `dlda` function trains the classifier and the `predict` function is used to make predictions on test data. It requires that the features be the columns of the table. We will again use the top 10 most differentially expressed genes.
+
+```{r}
+
 library(sparsediscrim)
-DLDAclassifier <- dlda(t(measurementsVStrain[best10T, ]), classesTrain)
-testResult <- predict(DLDAclassifier, t(measurementsVStest))
+
+# Build DLDA classifier
+DLDAclassifier <- dlda(t(geneTrain[best10T, ]), classesTrain)
+
+# Use the classifier to predict classes of some new samples
+testResult <- predict(DLDAclassifier, t(geneTest))
 DLDAclasses <- testResult[["class"]]
+
+# Calculate confusion matrix
 DLDAconfusion <- table(actual = classesTest, predicted = DLDAclasses)
 DLDAconfusion
+
+# Calculate accuracy as the number of predictions the model got correct
+sum(diag(DLDAconfusion))/sum(DLDAconfusion)
+
 ```
 
 There are `r sum(diag(DLDAconfusion))` samples correctly predicted and `r sum(DLDAconfusion) - sum(diag(DLDAconfusion))` samples incorrectly predicted.
@@ -331,8 +443,8 @@ There are `r sum(diag(DLDAconfusion))` samples correctly predicted and `r sum(DL
 Again, feature selection is necessary. The 10 largest Kolmogorov-Smirnov test statistics will be used.
 
 ```{r, warning = FALSE}
-trainSensitive <- measurementsVStrain[, classesTrain == "Sensitive"]
-trainResistant <- measurementsVStrain[, classesTrain == "Resistant"]
+trainSensitive <- geneTrain[, classesTrain == "Sensitive"]
+trainResistant <- geneTrain[, classesTrain == "Resistant"]
 trainSensitive <- as.list(as.data.frame(t(trainSensitive)))
 trainResistant <- as.list(as.data.frame(t(trainResistant)))
 
@@ -346,8 +458,8 @@ An implementation of naive Bayes is provided by the R package e1071. The `naiveB
 
 ```{r}
 library(e1071)
-NBclassifier <- naiveBayes(t(measurementsVStrain[best10KS, ]), classesTrain)
-NBclasses <- predict(NBclassifier, t(measurementsVStest))
+NBclassifier <- naiveBayes(t(geneTrain[best10KS, ]), classesTrain)
+NBclasses <- predict(NBclassifier, t(geneTest))
 NBconfusion <- table(actual = classesTest, predicted = NBclasses)
 NBconfusion
 ```
