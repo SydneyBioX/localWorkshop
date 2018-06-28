@@ -11,11 +11,13 @@ output:
     toc_float: true
     toc_depth: 1
     theme: yeti
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r, echo = FALSE}
 library(knitr)
-opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
+#opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
 options(width = 91)
 ```
 
@@ -37,11 +39,11 @@ You should open a new rmarkdown (Rmd) document. You will write all of your code 
 
 You will also need to install the following R packages.
 
-```{r}
+```{r eval=FALSE}
 source("https://bioconductor.org/biocLite.R")
 biocLite("ClassifyR")
 biocLite("DESeq2")
-biocLite("EDASeq")
+biocLite("vsn")
 biocLite("genefilter")
 install.packages('tidyverse')
 install.packages('sparsediscrim')
@@ -218,30 +220,38 @@ boxplot(counts(dds, normalize=TRUE)[, 1:50], ylim = c(0, 1500),
 
 ## Increasing Mean and Variance
 
+The variance of counts increases as the mean count increases when considering the trend based on all of the genes.
+
 The Bioconductor package [EDASeq](https://bioconductor.org/packages/release/bioc/html/EDASeq.html) contains function for **e**xploratory **d**ata **a**nalysis of RNA-**seq**. Observe the mean-variance relationship of the scaled counts.<br>
 **Hint**: EDASeq doesn't work with a matrix, but a `SeqExpressionSet` object. Read the documentation for how to create one by using the R command `?SeqExpressionSet`. A mean-variance plot can be drawn by `meanVarPlot`.
 
+
 ```{r, message = FALSE, warning = FALSE, fig.align = "center", fig.height = 5, fig.width = 5}
+
 library(EDASeq)
-AMLExpressionSet <- newSeqExpressionSet(scaledCounts)
+AMLExpressionSet <- newSeqExpressionSet(counts(dds,normalize = TRUE))
 meanVarPlot(AMLExpressionSet, log = TRUE, main = "Mean-Variance Plot")
+
 ```
+
+
 
 The red line is calculated from the data whereas the black line shows the mean and variance being the same value. Notice how the experimental variance increases at a faster rate than the mean $\equiv$ variance line, a trend commonly termed _overdispersion_.
 
-Using DESeq2's `varianceStabilizingTransformation` function, remove the relationship of variance to mean. Add the normalised values into the `AMLExpressionSet` object.<br>
+Most classifiers require that the input data set have a constant variance across the range of means. Using DESeq2's `vst` function, remove the relationship of variance to mean. Add the normalised values into the `AMLExpressionSet` object.<br>
 **Hint**: Check the documentation of `normCounts` for how to add normalised values to a `SeqExpressionSet` object.
 
 
 ```{r, warning = FALSE}
 library(DESeq2)
-measurementsVS <- varianceStabilizingTransformation(readCounts)
-normCounts(AMLExpressionSet) <- measurementsVS
+dds <- estimateDispersions(dds)
+measurementsVS <- assay(vst(dds))
 ```
 
 Visualise again the relationship between mean and variance.
 
 ```{r, fig.align = "center", fig.height = 5, fig.width = 5}
+normCounts(AMLExpressionSet) <- measurementsVS
 meanVarPlot(AMLExpressionSet, xlim = c(3, 9), ylim = c(0, 9), main = "Mean-Variance Plot")
 ```
 
