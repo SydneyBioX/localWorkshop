@@ -39,7 +39,7 @@ You should open a new rmarkdown (Rmd) document. You will write all of your code 
 
 You will also need to install the following R packages.
 
-```{r}
+```{r eval=FALSE}
 source("https://bioconductor.org/biocLite.R")
 biocLite("ClassifyR")
 biocLite("DESeq2")
