@@ -10,9 +10,7 @@ output:
     toc: true
     toc_float: true
     toc_depth: 3
-    theme: spacelab
-    include:
-      after_body: stylesDD.js
+    theme: yeti
 editor_options: 
   chunk_output_type: console
 ---
