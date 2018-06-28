@@ -1,4 +1,4 @@
-ID	Gender	Age	Response	Survival Time	Status	RUNX1-RUNX1T1 Fusion	RUNX1 Mutation
+Gender	Age	Response	Survival Time	Status	RUNX1-RUNX1T1 Fusion	RUNX1 Mutation
 GEO-13	Male	70	Resistant	126	Dead	No	Yes
 GEO-14	Male	61	Resistant	226	Dead	No	Yes
 GEO-15	Female	61	Resistant	103	Dead	No	Yes
