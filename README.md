@@ -20,3 +20,5 @@ Additionally, DESeq2, EDASeq and genefilter are used for some exploratory visual
 ```
 install(c("DESeq2", "EDASeq", "genefilter"))
 ```
+
+[Feedback form](https://docs.google.com/forms/d/e/1FAIpQLSfGcelEhhGF9WjC7jm7TwAIaRESA2E-556eqgoiVmxyqgqVXA)
