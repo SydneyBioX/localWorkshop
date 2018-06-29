@@ -361,7 +361,7 @@ X = as.data.frame(t(geneTrain[best10T,]))
 y = clinicalTrain$Response
 newX = as.data.frame(t(geneTest[best10T,]))
 
-SVMclassifierGene <- svm(X,as.numeric(y))
+SVMclassifierGene <- svm(X,y)
 SVMclassesGene <- predict(SVMclassifierGene, newX)
 
 
