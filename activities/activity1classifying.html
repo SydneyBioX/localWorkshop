@@ -9,7 +9,7 @@
 <meta name="generator" content="pandoc" />
 
 
-<meta name="author" content="Dario Strbenac" />
+<meta name="author" content="Dr Ellis Patrick, Dr Dario Strbenac, Dr Shila Ghazanfar, Prof Jean Yang" />
 
 <meta name="date" content="2018-06-29" />
 
@@ -96,6 +96,9 @@ img {
 .tabbed-pane {
   padding-top: 12px;
 }
+.html-widget {
+  margin-bottom: 20px;
+}
 button.code-folding-btn:focus {
   outline: none;
 }
@@ -135,7 +138,7 @@ $(document).ready(function ()  {
 
     // establish options
     var options = {
-      selectors: "h1,h2,h3",
+      selectors: "h1",
       theme: "bootstrap3",
       context: '.toc-content',
       hashGenerator: function (text) {
@@ -235,7 +238,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Selecting Biomarkers and Making Predictions</h1>
-<h4 class="author"><em>Dario Strbenac</em></h4>
+<h4 class="author"><em>Dr Ellis Patrick, Dr Dario Strbenac, Dr Shila Ghazanfar, Prof Jean Yang</em></h4>
 <h4 class="date"><em>29 June 2018</em></h4>
 
 </div>
@@ -244,18 +247,18 @@ div.tocify {
 <div id="activity-overview" class="section level1">
 <h1><span class="header-section-number">1</span> Activity Overview</h1>
 <ul>
-<li><p>RNA-seq data set: Acute Myeloid Leukaemia treatment resistance</p></li>
-<li><p>Exploratory data analysis and visualisation</p></li>
+<li><p>Loading RNA-seq data set: Acute Myeloid Leukaemia treatment resistance</p></li>
+<li><p>Cleaning and transformation</p></li>
 <li><p>Fitting widely used classifiers to a simple partition of the data set</p></li>
 </ul>
 </div>
 <div id="preparation" class="section level1">
 <h1><span class="header-section-number">2</span> Preparation</h1>
-<p>To complete todays workshops you will need to have R and Rstudio installed on your computer. Please see README file for more information.</p>
+<p>To complete today’s workshops, you will need to have R and Rstudio installed on your computer. Before attending the workshop, ensure R is at least version 3.5.0. Please see README file for more information.</p>
 <p>To install Bioconductor software, BiocManager must firstly be obtained from CRAN.</p>
 <pre><code>install.packages(&quot;BiocManager&quot;)
 library(BiocManager)</code></pre>
-<p>Before attending the workshop, ensure R is at least version 3.5.0 and install ClassifyR using</p>
+<p>Install ClassifyR using</p>
 <pre><code>install(&quot;ClassifyR&quot;, dependencies = TRUE)</code></pre>
 <p>Additionally, DESeq2, EDASeq and genefilter are used for some exploratory visualisations and analysis. They can be installed by running the command</p>
 <pre><code>install(c(&quot;DESeq2&quot;, &quot;EDASeq&quot;, &quot;genefilter&quot;))</code></pre>
@@ -275,24 +278,9 @@ readCounts &lt;- as.matrix(readCounts)
 sampleInfo &lt;- read.delim(url(&quot;https://raw.githubusercontent.com/SydneyBioX/localWorkshop/master/data/samples.txt&quot;), check.names = FALSE)</code></pre>
 <p><code>check.names = FALSE</code> prevents R unnecessarily changing hyphens and spaces in column names to periods.</p>
 </div>
-<div id="explore-the-clinical-data" class="section level2">
-<h2><span class="header-section-number">3.1</span> Explore the Clinical Data</h2>
-<p>The clinical data provides information about several different characteristics of the patients. Verify that there is data for 250 patients.<br> <strong>Hint</strong>: <code>sampleInfo</code> is a <code>data.frame</code>. Each row stores data for one patient.</p>
-<pre class="r"><code>head(sampleInfo)
-nrow(sampleInfo)</code></pre>
-<p>Observe the number of samples which are resistant to treatment and which are not.</p>
-<pre class="r"><code>table(sampleInfo[, &quot;Response&quot;])</code></pre>
-<p><span class="math inline">\(164 + 71 = 235\)</span>, so there are 15 patients with missing data regarding their resistance. Identify which rows of the clinical data they are in and remove the samples.</p>
-<pre class="r"><code>removeClinical &lt;- which(is.na(sampleInfo[, &quot;Response&quot;]))
-readCounts &lt;- readCounts[, -removeClinical]
-sampleInfo &lt;- sampleInfo[-removeClinical, ]</code></pre>
-<p>Remove outcome variables other than Response from the clinical table.</p>
-<pre class="r"><code>ignoreClinical &lt;- match(c(&quot;Status&quot;, &quot;Survival Time&quot;), colnames(sampleInfo))
-sampleInfo &lt;-sampleInfo[, -ignoreClinical]</code></pre>
-</div>
 <div id="extension-download-and-format-tables-from-geo" class="section level2">
-<h2><span class="header-section-number">3.2</span> Extension: Download and Format Tables From GEO</h2>
-<p>Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. Previously there were very clean and standardised ways to load data from GEO into R, however this is now often not the case. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.</p>
+<h2><span class="header-section-number">3.1</span> Extension: Download and Format Tables From GEO</h2>
+<p>Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. GEO is quite standardised for microarray datasets but not so for RNA-Seq (due to multiple ways to dealing with the sequenced reads). As a result, there are very clean and standardised ways to load data from GEO into R for microarray data, however this is now not the case for RNA-Seq data. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.</p>
 <pre class="r"><code>library(GEOquery)
 library(tools)
 
@@ -322,6 +310,21 @@ countsMatrix &lt;- do.call(cbind, lapply(sampleCounts, &quot;[[&quot;, 2))
 rownames(countsMatrix) &lt;- sampleCounts[[1]][[1]]
 colnames(countsMatrix) &lt;- sapply(strsplit(basename(countsFiles), '_'), '[', 2)</code></pre>
 </div>
+<div id="explore-the-clinical-data" class="section level2">
+<h2><span class="header-section-number">3.2</span> Explore the Clinical Data</h2>
+<p>The clinical data provides information about several different characteristics of the patients. Verify that there is data for 250 patients.<br> <strong>Hint</strong>: <code>sampleInfo</code> is a <code>data.frame</code>. Each row stores data for one patient.</p>
+<pre class="r"><code>head(sampleInfo)
+nrow(sampleInfo)</code></pre>
+<p>Observe the number of samples which are resistant to treatment and which are not.</p>
+<pre class="r"><code>table(sampleInfo[, &quot;Response&quot;], useNA = &quot;always&quot;)</code></pre>
+<p>There are 15 patients with missing data regarding their resistance. Identify which rows of the clinical data they are in and remove the samples.</p>
+<pre class="r"><code>removeClinical &lt;- which(is.na(sampleInfo[, &quot;Response&quot;]))
+readCounts &lt;- readCounts[, -removeClinical]
+sampleInfo &lt;- sampleInfo[-removeClinical, ]</code></pre>
+<p>Remove outcome variables other than Response from the clinical table.</p>
+<pre class="r"><code>ignoreClinical &lt;- match(c(&quot;Status&quot;, &quot;Survival Time&quot;), colnames(sampleInfo))
+sampleInfo &lt;-sampleInfo[, -ignoreClinical]</code></pre>
+</div>
 </div>
 <div id="processing-rna-seq-data" class="section level1">
 <h1><span class="header-section-number">4</span> Processing RNA-Seq data</h1>
@@ -340,13 +343,12 @@ colnames(countsMatrix) &lt;- sapply(strsplit(basename(countsFiles), '_'), '[', 2
 <pre class="r"><code>library(DESeq2)
 
 # Convert our counts into a DESeqDataSet
-
-dds &lt;- DESeqDataSetFromMatrix(countData = readCounts,
+DS2set &lt;- DESeqDataSetFromMatrix(countData = readCounts,
                               colData = data.frame(colNames = colnames(readCounts)),
                               design = ~ 1)</code></pre>
-<p>While not necessary, we will remove all genes with zero counts in 200 or more samples.<br> We will use <code>==</code> to test for zeros.</p>
-<pre class="r"><code>keep &lt;- rowSums(counts(dds) == 0) &lt; 200
-dds &lt;- dds[keep,]</code></pre>
+<p>We will remove all genes with zero counts in 200 or more samples to remove genes with no predictive power from taking up computing time.<br> We will use <code>==</code> to test for zeros.</p>
+<pre class="r"><code>keep &lt;- rowSums(counts(DS2set) == 0) &lt; 200
+DS2set &lt;- DS2set[keep,]</code></pre>
 </div>
 <div id="read-total-library-size-differences" class="section level2">
 <h2><span class="header-section-number">4.3</span> Read Total / Library Size Differences</h2>
@@ -354,33 +356,31 @@ dds &lt;- dds[keep,]</code></pre>
 <pre class="r"><code>readCounts[1:5, 1:5]
 dim(readCounts)</code></pre>
 <p>The number of reads per sample varies widely betwen patients by as much as 10-fold.</p>
-<pre class="r"><code>samplesCounts &lt;- colSums(counts(dds))
+<pre class="r"><code>samplesCounts &lt;- colSums(counts(DS2set))
 countsSummary &lt;- summary(samplesCounts)
 countsSummary</code></pre>
 <p>The limit of detection would be quite different between samples. We can also visualise this with a boxplot where we see that the distribution of gene expression values of each sample look quite different.</p>
-<pre class="r"><code>boxplot(counts(dds)[, 1:50], ylim = c(0, 1500),
+<pre class="r"><code>boxplot(counts(DS2set)[, 1:50], ylim = c(0, 1500),
         main = &quot;Gene Counts&quot;, ylab = &quot;Counts&quot;, cex = 0.25, xaxt = 'n')</code></pre>
 <p>We can alleviate this issue by scaling each column to have a similar number of counts. We will do this using the normalization procedure in DESeq2 <code>estimateSizeFactors</code>.</p>
-<pre class="r"><code>dds &lt;- estimateSizeFactors(dds)</code></pre>
+<pre class="r"><code>DS2set &lt;- estimateSizeFactors(DS2set)</code></pre>
 <p>Note how the disributions of counts per patient are now much more similar.</p>
-<pre class="r"><code>boxplot(counts(dds, normalize=TRUE)[, 1:50], ylim = c(0, 1500),
+<pre class="r"><code>boxplot(counts(DS2set, normalize=TRUE)[, 1:50], ylim = c(0, 1500),
         main = &quot;Gene Counts&quot;, ylab = &quot;Scaled Counts&quot;, cex = 0.25, xaxt = 'n')</code></pre>
 </div>
-<div id="increasing-mean-and-variance" class="section level2">
-<h2><span class="header-section-number">4.4</span> Increasing Mean and Variance</h2>
+<div id="mean-variance-relationship" class="section level2">
+<h2><span class="header-section-number">4.4</span> Mean-variance relationship</h2>
 <p>The variance of counts increases as the mean count increases when considering the trend based on all of the genes.</p>
 <p>The Bioconductor package <a href="https://bioconductor.org/packages/release/bioc/html/EDASeq.html">EDASeq</a> contains function for <strong>e</strong>xploratory <strong>d</strong>ata <strong>a</strong>nalysis of RNA-<strong>seq</strong>. Observe the mean-variance relationship of the scaled counts.<br> <strong>Hint</strong>: EDASeq doesn’t work with a matrix, but a <code>SeqExpressionSet</code> object. Read the documentation for how to create one by using the R command <code>?SeqExpressionSet</code>. A mean-variance plot can be drawn by <code>meanVarPlot</code>.</p>
 <pre class="r"><code>library(EDASeq)
-AMLExpressionSet &lt;- newSeqExpressionSet(counts(dds,normalize = TRUE))
+AMLExpressionSet &lt;- newSeqExpressionSet(counts(DS2set,normalize = TRUE))
 meanVarPlot(AMLExpressionSet, log = TRUE, main = &quot;Mean-Variance Plot&quot;)</code></pre>
 <p>The red line is calculated from the data whereas the black line shows the mean and variance being the same value. Notice how the experimental variance increases at a faster rate than the mean <span class="math inline">\(\equiv\)</span> variance line, a trend commonly termed <em>overdispersion</em>.</p>
 <p>Most classifiers require that the input data set have a constant variance across the range of means. Using DESeq2’s <code>vst</code> function, remove the relationship of variance to mean. Add the normalised values into the <code>AMLExpressionSet</code> object.<br> <strong>Hint</strong>: Check the documentation of <code>normCounts</code> for how to add normalised values to a <code>SeqExpressionSet</code> object.</p>
-<pre class="r"><code>dds &lt;- estimateDispersions(dds)
-measurementsVS &lt;- assay(vst(dds))</code></pre>
+<pre class="r"><code>measurementsVS &lt;- assay(vst(DS2set))</code></pre>
 <p>Visualise again the relationship between mean and variance.</p>
-<pre class="r"><code>normCounts(AMLExpressionSet) &lt;- measurementsVS</code></pre>
-<pre><code>## Warning in validityMethod(object): 'counts' contains non-integer numbers</code></pre>
-<pre class="r"><code>meanVarPlot(AMLExpressionSet, xlim = c(3, 9), ylim = c(0, 9), main = &quot;Mean-Variance Plot&quot;)</code></pre>
+<pre class="r"><code>normCounts(AMLExpressionSet) &lt;- measurementsVS
+meanVarPlot(AMLExpressionSet, xlim = c(3, 9), ylim = c(0, 9), main = &quot;Mean-Variance Plot&quot;)</code></pre>
 <p>Notice that the variance is now fairly constant across the range of means.</p>
 <p>Before doing any classification, the number of genes will be reduced to make feature selection faster. Keep the top 2000 most variable genes.<br> <strong>Hint</strong>: Use <code>var</code> in conjunction with <code>apply</code> to calculate the variance of each row of the stabilised values. Use <code>?order</code> to check how to make the <code>order</code> function sort values in descending order.</p>
 <pre class="r"><code>geneVariances &lt;- apply(measurementsVS, 1, var)
@@ -399,12 +399,13 @@ table(classes)</code></pre>
 <div id="training-and-test-sets" class="section level2">
 <h2><span class="header-section-number">5.1</span> Training and Test Sets</h2>
 <p>Split the samples into a training set and a test set.</p>
-<pre class="r"><code>geneTrain &lt;- measurementsVS[, 1:135]
-geneTest &lt;- measurementsVS[, 126:235]
-clinicalTrain &lt;- sampleInfo[1:135, ]
-clinicalTest &lt;- sampleInfo[126:235, ]
-classesTrain &lt;- classes[1:135]
-classesTest &lt;- classes[126:235]</code></pre>
+<pre class="r"><code>testIndex = 150:235
+geneTrain &lt;- measurementsVS[, -testIndex]
+geneTest &lt;- measurementsVS[, testIndex]
+clinicalTrain &lt;- sampleInfo[-testIndex, ]
+clinicalTest &lt;- sampleInfo[testIndex, ]
+classesTrain &lt;- classes[-testIndex]
+classesTest &lt;- classes[testIndex]</code></pre>
 </div>
 <div id="feature-selection" class="section level2">
 <h2><span class="header-section-number">5.2</span> Feature Selection</h2>
@@ -431,7 +432,7 @@ DLDAconfusion
 
 # Calculate accuracy as the number of predictions the model got correct
 sum(diag(DLDAconfusion))/sum(DLDAconfusion)</code></pre>
-<p>There are 86 samples correctly predicted and 24 samples incorrectly predicted.</p>
+<p>There are 64 samples correctly predicted and 22 samples incorrectly predicted.</p>
 </div>
 <div id="logistic-regression" class="section level2">
 <h2><span class="header-section-number">5.4</span> Logistic Regression</h2>
@@ -448,52 +449,61 @@ LRclassifier &lt;- glm(Response ~ ., &quot;binomial&quot;, clinicalTrain[, -fusi
 LRprobabilities &lt;- predict(LRclassifier, clinicalTest[, -fusionColumn], type = &quot;response&quot;)
 LRclasses &lt;- ifelse(LRprobabilities &gt; 0.5, levels(classes)[2], levels(classes)[1])
 
-
 # Calculate confusion matrix. 
 LRconfusion &lt;- table(actual = classesTest, predicted = LRclasses)
 LRconfusion
 
-
-
 # Calculate accuracy as the number of predictions the model got correct
 sum(diag(LRconfusion))/sum(LRconfusion)</code></pre>
-<p>There are 81 samples correctly predicted and 29 samples incorrectly predicted.</p>
+<p>There are 62 samples correctly predicted and 24 samples incorrectly predicted.</p>
 <p><br></p>
 <p>By looking at which variables were significant in the model, we may get an intuition for which variables are important. Here we see age as important.</p>
 <pre class="r"><code>summary(LRclassifier)</code></pre>
 </div>
-<div id="logistic-regression-on-gene-expression-data" class="section level3">
-<h3><span class="header-section-number">5.4.2</span> Logistic Regression on gene expression data</h3>
-<p>We could also use logistic regression with the gene expression data.</p>
-<pre class="r"><code>X = as.data.frame(t(geneTrain[best10T,]))
+</div>
+<div id="support-vector-machine-a-non-linear-boundary-classifier" class="section level2">
+<h2><span class="header-section-number">5.5</span> Support Vector Machine: A Non-Linear Boundary Classifier</h2>
+<p>An SVM classifier may either use a linear or non-linear boundary, depending on the user’s choice of <em>kernel</em>. Understanding how it works requires an undersanding of convex optimisation, so that is not covered in this course.</p>
+<p>The svm function in R is provided by a third programmer who developed a package named e1071. The default kernel used is the radial basis function kernel which calculates a non-linear boundary. Like many classical statistical classifiers, it requires the <strong>genes</strong> to be the <strong>columns</strong> of the matrix and the <strong>samples</strong> to be the <strong>rows</strong> of the matrix. The prediction function returns a factor of the predicted classes, unlike the other two algorithms which returned more infomation in a list.</p>
+<pre class="r"><code>library(e1071)
+
+X = as.data.frame(t(geneTrain[best10T,]))
 y = clinicalTrain$Response
-newX = as.data.frame(t(geneTest))
+newX = as.data.frame(t(geneTest[best10T,]))
 
-# Perform logistic regression 
-LRclassifierGene &lt;- glm(y ~ ., data = X,family =  &quot;binomial&quot;)
-LRprobabilitiesGene &lt;- predict(LRclassifierGene, newX , type = &quot;response&quot;)
+SVMclassifierGene &lt;- svm(X,as.numeric(y))
+SVMclassesGene &lt;- predict(SVMclassifierGene, newX)
 
-# Predict classes by probs &gt; 0.5
-LRclassesGene &lt;- ifelse(LRprobabilitiesGene &gt; 0.5, levels(classes)[2], levels(classes)[1])
 
 # Calculate confusion matrix. 
-LRconfusionGene &lt;- table(actual = classesTest, predicted = LRclassesGene)
-LRconfusionGene
+SVMconfusionGene &lt;- table(actual = classesTest, predicted = SVMclassesGene)
+SVMconfusionGene
 
 # Calculate accuracy as the number of predictions the model got correct
 
-sum(diag(LRconfusionGene))/sum(LRconfusionGene)
+sum(diag(SVMconfusionGene))/sum(SVMconfusionGene)</code></pre>
+</div>
+<div id="random-forest-a-non-linear-boundary-classifier" class="section level2">
+<h2><span class="header-section-number">5.6</span> Random Forest: A Non-Linear Boundary Classifier</h2>
+<p>A random forest is a set of decision trees which each guess the class of each sample. The class which has the most common guesses for a particular sample is predicted as that sample’s class. The decision boundary is often non-linear. For example, IF value &lt; 5 AND IF value &gt; 11 THEN Poor.</p>
+<p>Random forests in R are provided by the package <em>randomForest</em>. Random forests have a large number of options. Here, the default values are used. It requires the <strong>genes</strong> to be the <strong>columns</strong> of the matrix and the <strong>samples</strong> to be the <strong>rows</strong> of the matrix.</p>
+<p>Unlike dlda, randomForest takes the training data and test data all as inputs to one function. Also, the predicted classes are stored in the list element named “predicted”. Each programmer has his/her own convention and classification code written for one classifer won’t work for another.</p>
+<pre class="r"><code>library(randomForest)
+X = as.data.frame(t(geneTrain[best10T,]))
+y = clinicalTrain$Response
+newX = as.data.frame(t(geneTest[best10T,]))
 
-# Which genes appear to be contributing the most to the model?
+# Build a modekl and predict.
+RFclassifierGene &lt;- randomForest(X,y)
+RFclassesGene &lt;- predict(RFclassifierGene, newX)
 
-summary(LRclassifierGene)</code></pre>
-</div>
-</div>
-<div id="support-vector-machines-svm" class="section level2">
-<h2><span class="header-section-number">5.5</span> Support Vector Machines (SVM)</h2>
-</div>
-<div id="random-forests" class="section level2">
-<h2><span class="header-section-number">5.6</span> Random Forests</h2>
+# Calculate confusion matrix. 
+RFconfusionGene &lt;- table(actual = classesTest, predicted = RFclassesGene)
+RFconfusionGene
+
+# Calculate accuracy as the number of predictions the model got correct
+
+sum(diag(RFconfusionGene))/sum(RFconfusionGene)</code></pre>
 </div>
 <div id="naive-bayes-classifier" class="section level2">
 <h2><span class="header-section-number">5.7</span> naive Bayes classifier</h2>
@@ -506,14 +516,14 @@ trainResistant &lt;- as.list(as.data.frame(t(trainResistant)))
 KS &lt;- mapply(function(sensValues, resValues)
                       ks.test(sensValues, resValues)[[&quot;statistic&quot;]],
              trainSensitive, trainResistant)
-best10KS &lt;- order(abs(KS), decreasing = TRUE)</code></pre>
+best10KS &lt;- order(abs(KS), decreasing = TRUE)[1:10]</code></pre>
 <p>An implementation of naive Bayes is provided by the R package e1071. The <code>naiveBayes</code> function trains the classifier and the <code>predict</code> function is used to make predictions on test data. It requires that the features be the columns of the table.</p>
 <pre class="r"><code>library(e1071)
 NBclassifier &lt;- naiveBayes(t(geneTrain[best10KS, ]), classesTrain)
 NBclasses &lt;- predict(NBclassifier, t(geneTest))
 NBconfusion &lt;- table(actual = classesTest, predicted = NBclasses)
 NBconfusion</code></pre>
-<p>There are 70 samples correctly predicted and 40 samples incorrectly predicted.</p>
+<p>There are 62 samples correctly predicted and 24 samples incorrectly predicted.</p>
 <p><span style="font-size:34px;font-weight:300"> After the Break </span></p>
 <ul>
 <li><p>Basic cross-validation</p></li>

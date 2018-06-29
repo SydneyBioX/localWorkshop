@@ -1,6 +1,6 @@
 ---
 title: "Selecting Biomarkers and Making Predictions"
-author: "Dario Strbenac"
+author: "Dr Ellis Patrick, Dr Dario Strbenac, Dr Shila Ghazanfar, Prof Jean Yang"
 date: "29 June 2018"
 output:
   html_document:
@@ -9,7 +9,7 @@ output:
     self_contained: yes
     toc: true
     toc_float: true
-    toc_depth: 3
+    toc_depth: 1
     theme: yeti
 editor_options: 
   chunk_output_type: console
@@ -17,22 +17,22 @@ editor_options:
 
 ```{r, echo = FALSE}
 library(knitr)
-knitr::opts_chunk$set(echo = TRUE, cache = TRUE, results='hide', fig.show="hide", message = FALSE, warning = FALSE)
-#opts_knit[["set"]](root.dir = "/home/dario/Documents/tutorial/")
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "show", fig.show = "show")
 options(width = 91)
 ```
 
 # Activity Overview
 
-- RNA-seq data set: Acute Myeloid Leukaemia treatment resistance
+- Loading RNA-seq data set: Acute Myeloid Leukaemia treatment resistance
 
-- Exploratory data analysis and visualisation
+- Cleaning and transformation
 
 - Fitting widely used classifiers to a simple partition of the data set
 
 # Preparation
 
-To complete todays workshops you will need to have R and Rstudio installed on your computer. Please see README file for more information. 
+To complete today's workshops, you will need to have R and Rstudio installed on your computer. Before attending the workshop, ensure R is at least version 3.5.0. Please see README file for more information. 
 
 To install Bioconductor software, BiocManager must firstly be obtained from CRAN.
 
@@ -41,7 +41,7 @@ install.packages("BiocManager")
 library(BiocManager)
 ```
 
-Before attending the workshop, ensure R is at least version 3.5.0 and install ClassifyR using
+Install ClassifyR using
 
 ```
 install("ClassifyR", dependencies = TRUE)
@@ -52,7 +52,6 @@ Additionally, DESeq2, EDASeq and genefilter are used for some exploratory visual
 ```
 install(c("DESeq2", "EDASeq", "genefilter"))
 ```
-
 
 # RNA-seq Data Set: Acute Myeloid Leukaemia (AML) Treatment Resistance
 
@@ -66,8 +65,6 @@ install(c("DESeq2", "EDASeq", "genefilter"))
 
 Importing RNA-seq data from GEO Browser into R is a difficult process. Import the prepared tab-separated text files of RNA-seq read counts and clinical data from GitHub.
 
-
-
 ```{r}
 readCounts <- read.delim(url("https://raw.githubusercontent.com/SydneyBioX/localWorkshop/master/data/counts.txt"), check.names = FALSE)
 readCounts <- as.matrix(readCounts)
@@ -76,42 +73,9 @@ sampleInfo <- read.delim(url("https://raw.githubusercontent.com/SydneyBioX/local
 
 `check.names = FALSE` prevents R unnecessarily changing hyphens and spaces in column names to periods.
 
-
-## Explore the Clinical Data
-
-The clinical data provides information about several different characteristics of the patients. Verify that there is data for 250 patients.<br>
-**Hint**: `sampleInfo` is a `data.frame`. Each row stores data for one patient.
-
-```{r}
-head(sampleInfo)
-nrow(sampleInfo)
-```
-
-Observe the number of samples which are resistant to treatment and which are not.
-
-```{r}
-table(sampleInfo[, "Response"])
-```
-
-$164 + 71 = 235$, so there are 15 patients with missing data regarding their resistance. Identify which rows of the clinical data they are in and remove the samples.
-
-```{r}
-removeClinical <- which(is.na(sampleInfo[, "Response"]))
-readCounts <- readCounts[, -removeClinical]
-sampleInfo <- sampleInfo[-removeClinical, ]
-```
-
-Remove outcome variables other than Response from the clinical table.
-
-```{r}
-ignoreClinical <- match(c("Status", "Survival Time"), colnames(sampleInfo))
-sampleInfo <-sampleInfo[, -ignoreClinical]
-```
-
-
 ## Extension: Download and Format Tables From GEO
 
-Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. Previously there were very clean and standardised ways to load data from GEO into R, however this is now often not the case. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.
+Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. GEO is quite standardised for microarray datasets but not so for RNA-Seq (due to multiple ways to dealing with the sequenced reads). As a result, there are very clean and standardised ways to load data from GEO into R for microarray data, however this is now not the case for RNA-Seq data. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.
 
 ```{r, eval = FALSE}
 library(GEOquery)
@@ -144,6 +108,36 @@ rownames(countsMatrix) <- sampleCounts[[1]][[1]]
 colnames(countsMatrix) <- sapply(strsplit(basename(countsFiles), '_'), '[', 2)
 ```
 
+## Explore the Clinical Data
+
+The clinical data provides information about several different characteristics of the patients. Verify that there is data for 250 patients.<br>
+**Hint**: `sampleInfo` is a `data.frame`. Each row stores data for one patient.
+
+```{r}
+head(sampleInfo)
+nrow(sampleInfo)
+```
+
+Observe the number of samples which are resistant to treatment and which are not.
+
+```{r}
+table(sampleInfo[, "Response"], useNA = "always")
+```
+
+There are 15 patients with missing data regarding their resistance. Identify which rows of the clinical data they are in and remove the samples.
+
+```{r}
+removeClinical <- which(is.na(sampleInfo[, "Response"]))
+readCounts <- readCounts[, -removeClinical]
+sampleInfo <- sampleInfo[-removeClinical, ]
+```
+
+Remove outcome variables other than Response from the clinical table.
+
+```{r}
+ignoreClinical <- match(c("Status", "Survival Time"), colnames(sampleInfo))
+sampleInfo <-sampleInfo[, -ignoreClinical]
+```
 
 # Processing RNA-Seq data 
 
@@ -161,26 +155,21 @@ We will use the R package DESeq2 to transform our data to account for these to i
 
 To use DESeq2 to transform our data, we will need to load it into a DESeq2 object.
 ```{r message=FALSE}
-
 library(DESeq2)
 
 # Convert our counts into a DESeqDataSet
-
-dds <- DESeqDataSetFromMatrix(countData = readCounts,
+DS2set <- DESeqDataSetFromMatrix(countData = readCounts,
                               colData = data.frame(colNames = colnames(readCounts)),
                               design = ~ 1)
-
 ```
 
-
-While not necessary, we will remove all genes with zero counts in 200 or more samples.<br>
+We will remove all genes with zero counts in 200 or more samples to remove genes with no predictive power from taking up computing time.<br>
 We will use `==` to test for zeros.
 
 ```{r}
-keep <- rowSums(counts(dds) == 0) < 200
-dds <- dds[keep,]
+keep <- rowSums(counts(DS2set) == 0) < 200
+DS2set <- DS2set[keep,]
 ```
-
 
 ## Read Total / Library Size Differences
 
@@ -195,7 +184,7 @@ dim(readCounts)
 The number of reads per sample varies widely betwen patients by as much as 10-fold.
 
 ```{r}
-samplesCounts <- colSums(counts(dds))
+samplesCounts <- colSums(counts(DS2set))
 countsSummary <- summary(samplesCounts)
 countsSummary
 ```
@@ -203,52 +192,43 @@ countsSummary
 The limit of detection would be quite different between samples. We can also visualise this with a boxplot where we see that the distribution of gene expression values of each sample look quite different.
 
 ```{r, fig.height = 6, fig.width = 12}
-boxplot(counts(dds)[, 1:50], ylim = c(0, 1500),
+boxplot(counts(DS2set)[, 1:50], ylim = c(0, 1500),
         main = "Gene Counts", ylab = "Counts", cex = 0.25, xaxt = 'n')
 ```
 
-
 We can alleviate this issue by scaling each column to have a similar number of counts. We will do this using the normalization procedure in DESeq2 `estimateSizeFactors`.
 
-
 ```{r}
-dds <- estimateSizeFactors(dds)
+DS2set <- estimateSizeFactors(DS2set)
 ```
 
 Note how the disributions of counts per patient are now much more similar.
 
 ```{r, fig.height = 6, fig.width = 12}
-boxplot(counts(dds, normalize=TRUE)[, 1:50], ylim = c(0, 1500),
+boxplot(counts(DS2set, normalize=TRUE)[, 1:50], ylim = c(0, 1500),
         main = "Gene Counts", ylab = "Scaled Counts", cex = 0.25, xaxt = 'n')
 ```
 
-## Increasing Mean and Variance
+## Mean-variance relationship
 
 The variance of counts increases as the mean count increases when considering the trend based on all of the genes.
 
 The Bioconductor package [EDASeq](https://bioconductor.org/packages/release/bioc/html/EDASeq.html) contains function for **e**xploratory **d**ata **a**nalysis of RNA-**seq**. Observe the mean-variance relationship of the scaled counts.<br>
 **Hint**: EDASeq doesn't work with a matrix, but a `SeqExpressionSet` object. Read the documentation for how to create one by using the R command `?SeqExpressionSet`. A mean-variance plot can be drawn by `meanVarPlot`.
 
-
 ```{r, message = FALSE, warning = FALSE, fig.align = "center", fig.height = 5, fig.width = 5}
-
 library(EDASeq)
-AMLExpressionSet <- newSeqExpressionSet(counts(dds,normalize = TRUE))
+AMLExpressionSet <- newSeqExpressionSet(counts(DS2set,normalize = TRUE))
 meanVarPlot(AMLExpressionSet, log = TRUE, main = "Mean-Variance Plot")
-
 ```
-
-
 
 The red line is calculated from the data whereas the black line shows the mean and variance being the same value. Notice how the experimental variance increases at a faster rate than the mean $\equiv$ variance line, a trend commonly termed _overdispersion_.
 
 Most classifiers require that the input data set have a constant variance across the range of means. Using DESeq2's `vst` function, remove the relationship of variance to mean. Add the normalised values into the `AMLExpressionSet` object.<br>
 **Hint**: Check the documentation of `normCounts` for how to add normalised values to a `SeqExpressionSet` object.
 
-
 ```{r, warning = FALSE}
-dds <- estimateDispersions(dds)
-measurementsVS <- assay(vst(dds))
+measurementsVS <- assay(vst(DS2set))
 ```
 
 Visualise again the relationship between mean and variance.
@@ -283,25 +263,23 @@ classes <- sampleInfo[, "Response"]
 table(classes)
 ```
 
-
 ## Training and Test Sets
 
 Split the samples into a training set and a test set.
 
 ```{r}
-geneTrain <- measurementsVS[, 1:135]
-geneTest <- measurementsVS[, 126:235]
-clinicalTrain <- sampleInfo[1:135, ]
-clinicalTest <- sampleInfo[126:235, ]
-classesTrain <- classes[1:135]
-classesTest <- classes[126:235]
+testIndex = 150:235
+geneTrain <- measurementsVS[, -testIndex]
+geneTest <- measurementsVS[, testIndex]
+clinicalTrain <- sampleInfo[-testIndex, ]
+clinicalTest <- sampleInfo[testIndex, ]
+classesTrain <- classes[-testIndex]
+classesTest <- classes[testIndex]
 ```
-
 
 ## Feature Selection
 
 For many classification methods, it helps to input only genes which you feel will be useful for the prediction; including non-informative genes could introduce noise or facilitate over-fitting. For many of the following methods, we will use the 10 largest absolute t-statistics. The `rowttests` function enables thousands of t-tests to be calculated quickly. The 10 best features are chosen for illustration; this number should more generally be determined in a thoughtful way.
-
 
 ```{r, message = FALSE}
 library(genefilter)
@@ -309,15 +287,11 @@ tStatistic <- rowttests(geneTrain, classesTrain)[["statistic"]]
 best10T <- order(abs(tStatistic), decreasing = TRUE)[1:10]
 ```
 
-
 ## Diagonal Linear Discriminant Analysis (DLDA)
-
 
 An implementation of DLDA is provided by the R package sparsediscrim. The `dlda` function trains the classifier and the `predict` function is used to make predictions on test data. It requires that the features be the columns of the table. We will use the top 10 most differentially expressed genes in the model.
 
-
 ```{r}
-
 library(sparsediscrim)
 
 # Build DLDA classifier
@@ -333,12 +307,9 @@ DLDAconfusion
 
 # Calculate accuracy as the number of predictions the model got correct
 sum(diag(DLDAconfusion))/sum(DLDAconfusion)
-
 ```
 
 There are `r sum(diag(DLDAconfusion))` samples correctly predicted and `r sum(DLDAconfusion) - sum(diag(DLDAconfusion))` samples incorrectly predicted.
-
-
 
 ## Logistic Regression 
 
@@ -358,16 +329,12 @@ LRclassifier <- glm(Response ~ ., "binomial", clinicalTrain[, -fusionColumn])
 LRprobabilities <- predict(LRclassifier, clinicalTest[, -fusionColumn], type = "response")
 LRclasses <- ifelse(LRprobabilities > 0.5, levels(classes)[2], levels(classes)[1])
 
-
 # Calculate confusion matrix. 
 LRconfusion <- table(actual = classesTest, predicted = LRclasses)
 LRconfusion
 
-
-
 # Calculate accuracy as the number of predictions the model got correct
 sum(diag(LRconfusion))/sum(LRconfusion)
-
 ```
 
 There are `r sum(diag(LRconfusion))` samples correctly predicted and `r sum(LRconfusion) - sum(diag(LRconfusion))` samples incorrectly predicted.
@@ -381,44 +348,58 @@ By looking at which variables were significant in the model, we may get an intui
 summary(LRclassifier)
 ```
 
+## Support Vector Machine: A Non-Linear Boundary Classifier
 
-### Logistic Regression on gene expression data 
-We could also use logistic regression with the gene expression data.
+An SVM classifier may either use a linear or non-linear boundary, depending on the user's choice of *kernel*. Understanding how it works requires an undersanding of convex optimisation, so that is not covered in this course.
 
-
+The svm function in R is provided by a third programmer who developed a package named e1071. The default kernel used is the radial basis function kernel which calculates a non-linear boundary. Like many classical statistical classifiers, it requires the **genes** to be the **columns** of the matrix and the **samples** to be the **rows** of the matrix. The prediction function returns a factor of the predicted classes, unlike the other two algorithms which returned more infomation in a list.
 
 ```{r}
+library(e1071)
 
 X = as.data.frame(t(geneTrain[best10T,]))
 y = clinicalTrain$Response
-newX = as.data.frame(t(geneTest))
+newX = as.data.frame(t(geneTest[best10T,]))
 
-# Perform logistic regression 
-LRclassifierGene <- glm(y ~ ., data = X,family =  "binomial")
-LRprobabilitiesGene <- predict(LRclassifierGene, newX , type = "response")
+SVMclassifierGene <- svm(X,as.numeric(y))
+SVMclassesGene <- predict(SVMclassifierGene, newX)
 
-# Predict classes by probs > 0.5
-LRclassesGene <- ifelse(LRprobabilitiesGene > 0.5, levels(classes)[2], levels(classes)[1])
 
 # Calculate confusion matrix. 
-LRconfusionGene <- table(actual = classesTest, predicted = LRclassesGene)
-LRconfusionGene
+SVMconfusionGene <- table(actual = classesTest, predicted = SVMclassesGene)
+SVMconfusionGene
 
 # Calculate accuracy as the number of predictions the model got correct
 
-sum(diag(LRconfusionGene))/sum(LRconfusionGene)
-
-# Which genes appear to be contributing the most to the model?
-
-summary(LRclassifierGene)
-
-
+sum(diag(SVMconfusionGene))/sum(SVMconfusionGene)
 ```
 
-## Support Vector Machines (SVM)
+## Random Forest: A Non-Linear Boundary Classifier
 
+A random forest is a set of decision trees which each guess the class of each sample. The class which has the most common guesses for a particular sample is predicted as that sample's class. The decision boundary is often non-linear. For example, IF value < 5 AND IF value > 11 THEN Poor.
 
-## Random Forests
+Random forests in R are provided by the package *randomForest*. Random forests have a large number of options. Here, the default values are used. It requires the **genes** to be the **columns** of the matrix and the **samples** to be the **rows** of the matrix.
+
+Unlike dlda, randomForest takes the training data and test data all as inputs to one function. Also, the predicted classes are stored in the list element named "predicted". Each programmer has his/her own convention and classification code written for one classifer won't work for another.
+
+```{r}
+library(randomForest)
+X = as.data.frame(t(geneTrain[best10T,]))
+y = clinicalTrain$Response
+newX = as.data.frame(t(geneTest[best10T,]))
+
+# Build a modekl and predict.
+RFclassifierGene <- randomForest(X,y)
+RFclassesGene <- predict(RFclassifierGene, newX)
+
+# Calculate confusion matrix. 
+RFconfusionGene <- table(actual = classesTest, predicted = RFclassesGene)
+RFconfusionGene
+
+# Calculate accuracy as the number of predictions the model got correct
+
+sum(diag(RFconfusionGene))/sum(RFconfusionGene)
+```
 
 ## naive Bayes classifier
 
@@ -433,7 +414,7 @@ trainResistant <- as.list(as.data.frame(t(trainResistant)))
 KS <- mapply(function(sensValues, resValues)
                       ks.test(sensValues, resValues)[["statistic"]],
              trainSensitive, trainResistant)
-best10KS <- order(abs(KS), decreasing = TRUE)
+best10KS <- order(abs(KS), decreasing = TRUE)[1:10]
 ```
 
 An implementation of naive Bayes is provided by the R package e1071. The `naiveBayes` function trains the classifier and the `predict` function is used to make predictions on test data. It requires that the features be the columns of the table.
