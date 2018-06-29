@@ -1,0 +1,436 @@
+---
+title: "Session 1: Statistical Machine Learning"
+subtitle: ""
+author: "Prof Jean Yang, Dr Dario Strbenac, Dr Ellis Patrick, Dr Shila Ghazanfar"
+date: "29 June 2018"
+output:
+  xaringan::moon_reader:
+    css: ["default", "assets/sydney-fonts.css", "assets/sydney.css"]
+    self_contained: false # if true, fonts will be stored locally
+    seal: true # show a title slide with YAML information
+    nature:
+      beforeInit: ["assets/remark-zoom.js"]
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: '16:9'
+      navigation:
+        scroll: true
+---
+
+```{r, echo=FALSE}
+options(width = 91)
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+
+## .brand-red[Roadmap]
+
+- .brand-red[Part 1: Introduction to statistical machine learning]
+  - Using R code to build classification models with RNA-seq or microarray data and basic performance assessment: 90 minutes.
+
+- Afternoon tea: 30 minutes. 
+
+--
+
+- .brand-red[Part 2: Performance assessment with cross-validation]
+  - Understanding the ClassifyR package and using cross-validation to assess an existing classifier: 80 minutes. 
+
+- Final wrap up - overview of the latest methods on biologically guided machine learning approaches: 10 minutes. 
+
+---
+
+## Terminology 
+
+- Statistical machine learning
+  - .brand-red[Unsupervised:]  classes unknown, want to discover them from the data (cluster analysis)
+  - .brand-red[Supervised:]  classes are predefined, want to use a (training or learning) set of labeled objects to form a classifier for classification of future observations
+
+- Alternative terminology
+  - Computer science: unsupervised and supervised learning.
+  - Bioinformatics literature: class discovery and class prediction.
+  - Statistics: Clustering and classification or discriminant analysis.
+  
+- In this workshop, we will focus on .brand-red[Supervised learning] and building classification models.
+
+---
+
+## Finding omics data online
+
+- Short Read Archive http://www.ncbi.nlm.nih.gov/Traces/sra 
+
+- Gene Expression Omnibus https://www.ncbi.nlm.nih.gov/geo/
+
+- The Cancer Genome Atlas https://cancergenome.nih.gov/
+
+- Synapse https://www.synapse.org 
+
+- Recount2 https://jhubiostatistics.shinyapps.io/recount/ 
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide01.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide02.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide03.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide04.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide05.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide06.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide07.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide08.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide09.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide10.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+## Feature selection
+
+.brand-red[Why?]
+- Lead to better classification performance by removing variables that are noisy with respect to the outcome.
+- May provide useful insights into etiology of a disease.
+- Can eventually lead to the diagnostic tests (e.g. "lympho chip")
+
+--
+
+.brand-red[Approaches?]
+
+Methods fall into three basic categories:
+- Filter methods
+- Wrapper methods
+- Embedded methods
+
+The simplest and most frequently used methods are the .brand-red[filter] methods.
+---
+
+## Feature selection: filter method
+
+- Typical RNA-Seq experiments measure tens of thousands of genes
+- In reality, only a subset of these are related to the outcome
+- Typically aim to select features that appear differentially expressed in the training dataset
+
+<!-- - In some sense, this is like finding differential expressed genes between two conditions.  -->
+<!-- - These days, people use the limma package from Bioconductor -->
+
+**Note:** The feature selection should be done within cross-validation for correctness.
+
+
+---
+## Case study: Acute Myeloid Leukaemia (AML) Treatment Resistance
+
+--
+
+- Primary therapy resistance is a major problem in acute myeloid leukemia treatment. Approximately 20-30% of younger adult patients with AML and as many as 50% of older adults are refractory to induction treatment.
+
+- Research findings are <a href="http://www.haematologica.org/content/103/3/456" target="_blank">published</a> in *Haematologica* in 2018.
+
+- The data is available from <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE106291" target="_blank">GEO Browser</a> as 250 `txt.gz` files of gene-level read counts or a Microsoft Excel file where the gene expression values were standardised to have a mean of 0 and variance of 1.
+
+--
+
+- Data input and processing will be covered in more detail in hands-on part
+
+<!-- --- -->
+<!-- ## Case study: Acute Myeloid Leukaemia (AML) Treatment Resistance -->
+
+
+<!-- Import the prepared tab-separated text files of RNA-seq read counts and clinical data. -->
+
+```{r, eval=TRUE, echo=FALSE}
+readCounts = read.delim("data/counts.txt", check.names = FALSE)
+readCounts = as.matrix(readCounts)
+sampleInfo = read.delim("data/samples.txt", check.names = FALSE)
+```
+
+<!-- Reference Lab: Section 1.1 Reading data -->
+---
+## Clinical Data
+
+The clinical data provides information about seven different characteristics of the patients.
+
+- The phenotype of interest here is **Response**
+
+```{r}
+head(sampleInfo)
+nrow(sampleInfo)
+```
+
+---
+## Clinical Data
+
+Observe the number of samples which are resistant to treatment and which are not.
+
+```{r}
+table(sampleInfo[, "Response"], useNA="always")
+```
+
+--
+
+`r sum(sampleInfo[, "Response"] == "Resistant", na.rm=TRUE)` patients are Resistant, `r sum(sampleInfo[, "Response"] == "Sensitive", na.rm=TRUE)` Sensitive and `r sum(is.na(sampleInfo[, "Response"]))` patients have no resistance information.
+
+---
+## Gene expression data: Read counts
+
+- This will be explored further in the hands-on part.
+
+```{r}
+dim(readCounts)
+```
+
+There are `r nrow(readCounts)` genes in the counts table and `r ncol(readCounts)` AML patients.
+
+--
+
+```{r}
+readCounts[1:6, 1:6]
+```
+
+<!-- --- -->
+<!-- ## Transforming the data -->
+
+<!-- - Typically RNA-Seq measurements are scaled to take into account the total library size -->
+<!-- - Also log-transformed due to the large dynamic range of counts and variance -->
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(edgeR)
+readsCPM = log2(1+cpm(readCounts))
+```
+
+```{r, echo = FALSE, include=FALSE}
+# match the matrices and remove the missing
+sampleInfoComplete = sampleInfo[!is.na(sampleInfo[,"Response"]),]
+readsCPM = readsCPM[,sampleInfoComplete[,"ID"]]
+
+library(genefilter)
+Tstatistics = rowttests(readsCPM, sampleInfoComplete[,"Response"], tstatOnly = TRUE)
+head(Tstatistics[order(abs(Tstatistics[,"statistic"]), decreasing=TRUE),])
+```
+
+---
+## Discovery and Validation Data
+
+<!-- - Discovery and Validation Data: -->
+- For this workshop, we will be splitting our data into equal discovery and validation sets.
+- We will use the validation set to assess our simple 2-gene classifiers - you will look at other feature selection methods in the hands-on part
+
+```{r, echo=FALSE, include=FALSE}
+trainingIndex = 1:ceiling(nrow(sampleInfoComplete)/2)
+testingIndex = max(trainingIndex+1):nrow(sampleInfoComplete)
+
+readsCPM_train = readsCPM[,trainingIndex]
+readsCPM_test = readsCPM[,testingIndex]
+```
+
+
+```{r}
+dim(readsCPM_train)
+table(sampleInfoComplete[trainingIndex,"Response"])
+dim(readsCPM_test)
+```
+
+
+---
+## DLDA: A Linear Boundary Classifier
+Diagonal Linear Discriminant Analysis (DLDA) is special version of LDA which assumes no covariance between the features which enables it to be used when the number of genes exceeds the number of samples - an almost universal occurrence in omics. .brand-red[If there were only two genes used, the separation line would be a straight line.] In higher dimensions, it is a plane.
+
+```{r, echo=FALSE}
+library(sparsediscrim)
+twoGenes = readsCPM[c("TMUB2","PHF8"),]
+twoGenes_train = readsCPM_train[c("TMUB2","PHF8"),]
+twoGenes_test = readsCPM_test[c("TMUB2","PHF8"),]
+trained_dlda = dlda(t(twoGenes), sampleInfoComplete[,"Response"])
+```
+
+```{r, echo = FALSE, fig.height = 6, fig.width = 6}
+library(scales)
+plot(t(twoGenes), type = "n",
+     xlim = c(4,7.5),
+     ylim = c(5,8))
+grid = expand.grid(seq(4,7.5,length.out = 100),
+                   seq(5,8,length.out = 100))
+gridClasses_dlda = apply(grid,1,function(x) predict(trained_dlda, x)[["class"]])
+points(grid[,1], grid[,2], col = alpha(as.numeric(gridClasses_dlda) + 2, 0.1),
+       cex = 1, pch = 15)
+points(t(twoGenes), 
+     # pch = 16, 
+     col = as.numeric(sampleInfoComplete[,"Response"])+2,
+     pch = as.numeric(sampleInfoComplete[,"Response"])+15)
+```
+
+---
+## DLDA: A Linear Boundary Classifier
+
+DLDA from sparsediscrim for this case study has no tuning parameters to specify. Like many classical statistical classifiers, it requires the genes to be the .brand-red[columns] of the matrix and the samples to be the .brand-red[rows] of the matrix.
+
+```{r, eval=TRUE}
+library(sparsediscrim)
+twoGenes_train = readsCPM_train[c("TMUB2","PHF8"),]
+trained_dlda = dlda(t(twoGenes_train), sampleInfoComplete[trainingIndex,"Response"])
+
+predicted_dlda = predict(trained_dlda, t(twoGenes_test))[["class"]]
+table(sampleInfoComplete[testingIndex,"Response"], predicted_dlda)
+```
+
+- This is a confusion matrix showing the **known** response as well as what we predicted
+- In the hands-on session you will use these types of output to evaluate the performance of classifiers
+
+---
+## Random Forest: A Non-Linear Boundary Classifier
+
+A random forest is a set of decision trees which each guess the class of each sample. The class which has the most common guesses for a particular sample is predicted as that sample's class. The decision boundary is often non-linear. For example, IF value < 5 AND IF value > 11 THEN Poor.
+
+Random forests in R are provided by the package *randomForest*. Random forests have a large number of options. Here, the default values are used. Like DLDA, it requires the **genes** to be the **columns** of the matrix and the **samples** to be the **rows** of the matrix.
+
+---
+## Random Forest: A Non-Linear Boundary Classifier
+
+Unlike DLDA, randomForest takes the training data and test data all as inputs to one function. Also, the predicted classes are stored in the list element named "predicted". Each programmer has his/her own convention and classification code written for one classifer won't work for another.
+
+```{r, message = FALSE}
+library(randomForest)
+```
+
+```{r}
+trained_rf = randomForest(t(twoGenes_train), 
+                          sampleInfoComplete[trainingIndex,"Response"])
+
+predicted_rf = predict(trained_rf, t(twoGenes_test))
+table(sampleInfoComplete[testingIndex,"Response"], predicted_rf)
+```
+
+
+---
+## Support Vector Machine: Non-Linear Boundary
+
+An SVM classifier may either use a linear or non-linear boundary, depending on the user's choice of *kernel*. Understanding how it works requires an undersanding of convex optimisation, so that is not covered in this course.
+
+The default kernel used is the radial basis function kernel which calculates a non-linear boundary. Like many classical statistical classifiers, it requires the **genes** to be the **columns** of the matrix and the **samples** to be the **rows** of the matrix.
+
+```{r}
+library(e1071)
+trained_svm = svm(t(twoGenes_train), sampleInfoComplete[trainingIndex,"Response"])
+
+predicted_svm = predict(trained_svm, t(twoGenes_test))
+table(sampleInfoComplete[testingIndex,"Response"], predicted_svm)
+```
+
+---
+## Summary of classifiers
+
+- We can look at the fitted models to better understand how these classifiers behave.
+- This is only for two genes, things become more difficult to visualise in higher dimensions.
+- Different classifiers have different strengths and may be more suitable in different circumstances
+
+```{r, echo = FALSE, fig.height = 5, fig.width = 14}
+
+par(mfrow=c(1,3))
+
+gridClasses_dlda = predict(trained_dlda, grid)[["class"]]
+gridClasses_rf = apply(grid,1,function(x) predict(trained_rf, x))
+gridClasses_svm = predict(trained_svm, grid)
+
+plot(t(twoGenes), type = "n",
+     xlim = c(4,7.5),
+     ylim = c(5,8),
+     main = "DLDA")
+points(grid[,1], grid[,2], 
+       col = alpha(as.numeric(gridClasses_dlda) + 2, 0.1),
+       cex = 1, pch = 15)
+points(t(twoGenes), 
+     # pch = 16, 
+     col = as.numeric(sampleInfoComplete[,"Response"])+2,
+     pch = as.numeric(sampleInfoComplete[,"Response"])+15)
+
+plot(t(twoGenes), type = "n",
+     xlim = c(4,7.5),
+     ylim = c(5,8),
+     main = "Random Forest")
+points(grid[,1], grid[,2], 
+       col = alpha(as.numeric(gridClasses_rf) + 2, 0.1),
+       cex = 1, pch = 15)
+points(t(twoGenes), 
+     # pch = 16, 
+     col = as.numeric(sampleInfoComplete[,"Response"])+2,
+     pch = as.numeric(sampleInfoComplete[,"Response"])+15)
+
+
+plot(t(twoGenes), type = "n",
+     xlim = c(4,7.5),
+     ylim = c(5,8),
+     main = "SVM")
+points(grid[,1], grid[,2], 
+       col = alpha(as.numeric(gridClasses_svm) + 2, 0.1),
+       cex = 1, pch = 15)
+points(t(twoGenes), 
+     # pch = 16, 
+     col = as.numeric(sampleInfoComplete[,"Response"])+2,
+     pch = as.numeric(sampleInfoComplete[,"Response"])+15)
+```
+
+
+---
+
+## Later today: Performance assessment
+
+<!-- - Feature selection stability. -->
+
+- Evaluation of overall error, sample-specific error, precision, recall.
+
+- Cross-validation to evaluate classifier performance
+
+- Comparison of the DLDA, Random forest and SVM classifiers.
+
+
+---
+## Now: Hands-on session
+
+- Activity Overview
+  - Loading RNA-seq data set: Acute Myeloid Leukaemia treatment resistance
+  - Cleaning and transformation
+  - Fitting widely used classifiers to a simple partition of the data set
+
+

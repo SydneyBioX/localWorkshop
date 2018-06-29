@@ -1,0 +1,388 @@
+---
+title: "Session 2: Cross-validation"
+subtitle: ""
+author: "Prof Jean Yang, Dr Dario Strbenac, Dr Ellis Patrick, Dr Shila Ghazanfar"
+date: "29 June 2018"
+output:
+  xaringan::moon_reader:
+    css: ["default", "assets/sydney-fonts.css", "assets/sydney.css"]
+    self_contained: false # if true, fonts will be stored locally
+    seal: true # show a title slide with YAML information
+    nature:
+      beforeInit: ["assets/remark-zoom.js"]
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: '16:9'
+      navigation:
+        scroll: true
+---
+
+```{r, echo = FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+## .brand-red[Roadmap]
+
+- .brand-red[Part 1: Introduction to statistical machine learning]
+- Using R code to build classification models with RNA-seq or microarray data and basic performance assessment: 90 minutes.
+
+- Afternoon tea: 30 minutes. 
+
+
+- .brand-red[Part 2: Performance assessment with cross-validation]
+
+- Understanding the ClassifyR package and using cross-validation to assess an existing classifier: 80 minutes. 
+
+- Final wrap up - overview of the latest methods on biologically guided machine learning approaches: 10 minutes. 
+
+
+---
+## Performance Assessment
+
+- Any .brand-blue[*classification rule*] needs to be .brand-blue[*evaluated*] for its performance on the future samples. It is almost never the case in microarray studies that a large independent population-based collection of samples is available at the time of initial classifier-building phase.  
+
+- One needs to estimate future performance based on what is available: often the same set that is used to build the classifier.  
+
+- Assessing performance of the classifier based on
+  - Cross-validation.
+  - Test set.
+  - Independent testing on future dataset.
+  - Independent testing on existing dataset (integrative analysis).
+
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide29.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide30.png")
+background-size: contain
+background-position: 50% 50%
+
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide31.png")
+background-size: contain
+background-position: 50% 50%
+
+---
+
+## Cross-validation
+
+- Cross-validation is the procedure of selecting features and training a classifier on a set of samples and making predictions on a distinct set of samples.
+
+
+- There are many cross-validation schemes commonly used in practice.
+  - *k*-fold cross-validation
+  - Leave-one-out cross-validation
+  - Repeated *k*-fold cross-validation
+
+
+
+---
+
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide32.png")
+background-size: contain
+background-position: 50% 50%
+
+
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide34.png")
+background-size: contain
+background-position: 50% 50%
+
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide35.png")
+background-size: contain
+background-position: 50% 50%
+
+
+---
+class: middle, bottom
+background-image: url("SessionsImagesOnly/Slide36.png")
+background-size: contain
+background-position: 50% 50%
+
+
+
+
+---
+
+## Reproducible Cross-validation
+
+- A standardised form of cross-validation is not provided by a standard R installation. Often, researchers code their own cross-validation loop for each project, allowing opportunities for implementation inconsistencies to occur.  
+
+
+- A few frameworks have been developed (e.g. MCRestimate, MLInterfaces, caret) but their focus is on classification, so evaluation of the features and predictions is not comprehensive.  
+
+- Input formats of existing frameworks don't seamlessly handle new data containers for omics data sets, such as `MultiAssayExperiment`.  
+
+- `ClassifyR` provides a standardised cross-validation framework with a focus on performance evaluation and seamlessly integrates with `MultiAssayExperiment`.
+
+
+
+```{r, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
+readCounts = read.delim("data/counts.txt", check.names = FALSE)
+readCounts = as.matrix(readCounts)
+sampleInfo = read.delim("data/samples.txt", check.names = FALSE)
+
+removeClinical <- which(is.na(sampleInfo[, "Response"]))
+readCounts <- readCounts[, -removeClinical]
+sampleInfo <- sampleInfo[-removeClinical, ]
+
+ignoreClinical <- match(c("Status", "Survival Time"), colnames(sampleInfo))
+sampleInfo <-sampleInfo[, -ignoreClinical]
+
+library(DESeq2)
+
+# Convert our counts into a DESeqDataSet
+
+dds <- DESeqDataSetFromMatrix(countData = readCounts,
+                              colData = data.frame(colNames = colnames(readCounts)),
+                              design = ~ 1)
+
+keep <- rowSums(counts(dds) == 0) < 200
+dds <- dds[keep,]
+dds <- estimateSizeFactors(dds)
+dds <- estimateDispersions(dds)
+measurementsVS <- assay(vst(dds))
+geneVariances <- apply(measurementsVS, 1, var)
+mostVariable <- order(geneVariances, decreasing = TRUE)[1:2000]
+measurementsVS <- measurementsVS[mostVariable, ]
+
+classes <- sampleInfo[, "Response"]
+
+
+geneData <- t(measurementsVS)
+
+tStatistic <- genefilter::rowttests(measurementsVS, classes)[["statistic"]]
+best10T <- order(abs(tStatistic), decreasing = TRUE)[1:10]
+
+
+```
+
+---
+
+## ClassifyR Framework
+
+- A *framework* for feature selection, cross-validated classification and its performance evaluation.
+
+- Some popular feature selection methods and classifiers implemented in the package.
+
+- Runs cross-validation in parallel on Windows, MacOS, Linux operating systems.
+
+- Supports numeric-only (`matrix`) data, mixed numeric-categorical (`DataFrame`) data and multi-omics data (`MultiAssayExperiment`).
+
+- Continually maintained and supported (first released in 2014).  
+
+---
+
+## Key concepts
+
+- Each stage of classification is defined by a parameter object.
+
+- The three key objects you should be aware of when using ClassifyR 
+
+  - `SelectParams` Feature selection for choosing which genes go into the model. 
+  - `TrainParams` This object is where you define your classifier eg. DLDA
+  - `ClassifyResult` The object which will store the results from your CV performed by `runTests`.
+
+
+---
+
+## Running cross-validation with ClassifyR
+
+- The default feature selection method of `SelectParams` is a moderated t-test based ranking and selection of the top $p$ genes that give the best resubstitution error (considering 10, 20, ..., 100 top-ranked features). 
+
+- The default training and prediction methods for `TrainParams` are for Diagonal Linear Discriminant Analysis (DLDA). 
+
+- A 20 permutations and 5 folds cross-validation using default selection and classification methods is done using `runTests`.
+
+```{r message=FALSE}
+library(ClassifyR)
+classifiedDLDA <- runTests(measurements = measurementsVS, classes = classes, 
+                           datasetName = "AML", classificationName = "DLDA",
+                           permutations = 20, seed = 2018)
+```
+
+
+---
+
+## Accuracy
+
+- The overall proportion of predictions which were correct.  
+
+
+Confusion matrix
+
+| Actual \ Predicted         | Negative           | Positive  |
+| ------------- |:-------------:| -----:|
+| **Negative**     | True Negative (TN) | False Negative (FN) |
+| **Positive**     | False Positive (FP)      |   True Positive (TP) |
+
+
+
+- Accuracy = (TP + TN) / (TP + TN + FP + FN)
+
+
+```{r}
+classifiedDLDA <- calcCVperformance(classifiedDLDA, "accuracy")
+performance(classifiedDLDA)["Accuracy"]
+```
+
+
+---
+
+## Error Rate
+
+- The proportion of samples which were assigned to the incorrect class by the classifier.  
+
+
+Confusion matrix
+
+| Actual \ Predicted         | Negative           | Positive  |
+| ------------- |:-------------:| -----:|
+| **Negative**     | True Negative (TN) | False Negative (FN) |
+| **Positive**     | False Positive (FP)      |   True Positive (TP) |
+
+
+
+- Error rate = (FP + FN) / (TP + TN + FP + FN) = 1 - Accuracy
+
+
+```{r}
+classifiedDLDA <- calcCVperformance(classifiedDLDA, "error")
+performance(classifiedDLDA)["Error Rate"]
+```
+
+
+
+---
+
+## Other metrics
+
+- Balanced Error Rate
+
+  - Simply the average error rate of each class.  
+
+  - Provides a fair evaluation for imbalanced data sets (each class contributes equally).  
+
+  - Same as ordinary error rate for balanced data sets.
+
+- Precision
+
+  - The proportion of predictions of the Positive class which are truly Positive.
+
+- Recall 
+
+  - Proportion of the Positives that are predicted correctly.
+
+
+---
+
+## SVM
+
+Perform 5-fold cross-validation on a Support Vector Machines classifier
+
+```{r message=FALSE}
+trainParams <- TrainParams(SVMtrainInterface)
+predictParams <- PredictParams(SVMpredictInterface,getClasses = function(result) result)
+classifiedSVM <- runTests(measurementsVS, classes, "AML", "SVM",permutations = 20, 
+                          seed = 2018, params = list(trainParams, predictParams))
+
+```
+
+
+---
+
+## Performance comparison
+
+```{r echo=FALSE, message=FALSE}
+library(ggplot2)
+```
+
+
+```{r message=FALSE, warning=FALSE, fig.height=5, fig.width=7}
+classifiedSVM <- calcCVperformance(classifiedSVM, "error")
+performancePlot(list(classifiedDLDA, classifiedSVM),
+                performanceName = "Error Rate", title = "Errors", yLimits = c(0,0.6),
+                plot=FALSE) + geom_hline(yintercept = 0.5, colour = "red")
+
+```
+
+
+
+---
+
+## Sample-specific error rate
+
+
+The function `calcCVperformance` can be used to calculate sample-specific error rates for each patient.
+
+```{r, fig.width = 10, fig.height = 5}
+classifiedDLDA <- calcCVperformance(classifiedDLDA, "sample error")
+classifiedSVM <- calcCVperformance(classifiedSVM, "sample error")
+errorPlot <- samplesMetricMap(list(classifiedDLDA, classifiedSVM), xAxisLabel = "Samples",
+                              yAxisLabel = "Classifier", showXtickLabels = FALSE)
+```
+
+DLDA is the only method which has a similar error profile in the minority and majority class.
+
+---
+## Performance comparison
+
+```{r echo=FALSE, message=FALSE}
+library(ggplot2)
+```
+
+
+```{r message=FALSE, warning=FALSE, fig.height=5, fig.width=7}
+classifiedDLDA <- calcCVperformance(classifiedDLDA, "balanced error")
+classifiedSVM <- calcCVperformance(classifiedSVM, "balanced error")
+performancePlot(list(classifiedDLDA, classifiedSVM), performanceName = "Balanced Error Rate",
+                title = "Balanced Errors", yLimits = c(0,0.6), plot=FALSE) +
+                geom_hline(yintercept = 0.5, colour = "red")
+```
+
+
+---
+
+## Model Stability
+
+Plot the distribution of overlaps of selected features used in the DLDA classifier.
+
+```{r, fig.align = "center", fig.width = 8, fig.height = 3}
+withinChoices <- selectionPlot(list(classifiedDLDA),
+                               xVariable = "selectionName", xLabel = "Selection Method",
+                               columnVariable = "None",
+                               boxFillColouring = "None", boxLineColouring = "None",
+                               rotate90 = TRUE)
+```
+
+
+---
+## Performance assessment
+
+
+- Cross-validation to evaluate classifier performance
+
+
+- Evaluation of overall error, sample-specific error, precision, recall.
+
+
+- Feature selection stability.
+
+---
+## Now: Hands-on session
