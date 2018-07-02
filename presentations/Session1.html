@@ -6,8 +6,8 @@
     <meta name="author" content="Prof Jean Yang, Dr Dario Strbenac, Dr Ellis Patrick, Dr Shila Ghazanfar" />
     <meta name="date" content="2018-06-29" />
     <link href="Session1_files/remark-css-0.0.1/default.css" rel="stylesheet" />
-    <link rel="stylesheet" href="styling/sydney-fonts.css" type="text/css" />
-    <link rel="stylesheet" href="styling/sydney.css" type="text/css" />
+    <link rel="stylesheet" href="styling\sydney-fonts.css" type="text/css" />
+    <link rel="stylesheet" href="styling\sydney.css" type="text/css" />
   </head>
   <body>
     <textarea id="source">
@@ -319,11 +319,6 @@ Diagonal Linear Discriminant Analysis (DLDA) is special version of LDA which ass
 
 
 
-
-```
-## Warning in as.character(col) %in% "0": NAs introduced by coercion
-```
-
 ![](Session1_files/figure-html/unnamed-chunk-12-1.png)&lt;!-- --&gt;
 
 ---
@@ -380,8 +375,8 @@ table(sampleInfoComplete[testingIndex, "Response"], predicted_rf)
 ```
 ##            predicted_rf
 ##             Resistant Sensitive
-##   Resistant         7        20
-##   Sensitive        27        63
+##   Resistant         8        19
+##   Sensitive        28        62
 ```
 
 ---
@@ -413,12 +408,6 @@ table(sampleInfoComplete[testingIndex, "Response"], predicted_svm)
 - We can look at the fitted models to better understand how these classifiers behave.
 - This is only for two genes, things become more difficult to visualise in higher dimensions.
 - Different classifiers have different strengths and may be more suitable in different circumstances
-
-
-```
-## Warning in plot.xy(xy.coords(x, y), type = type, ...): semi-transparency is not supported
-## on this device: reported only once per page
-```
 
 ![](Session1_files/figure-html/unnamed-chunk-17-1.png)&lt;!-- --&gt;
 
