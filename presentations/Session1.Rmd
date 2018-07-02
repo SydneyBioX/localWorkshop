@@ -5,11 +5,10 @@ author: "Prof Jean Yang, Dr Dario Strbenac, Dr Ellis Patrick, Dr Shila Ghazanfar
 date: "29 June 2018"
 output:
   xaringan::moon_reader:
-    css: ["default", "assets/sydney-fonts.css", "assets/sydney.css"]
+    css: ["default", "styling/sydney-fonts.css", "styling/sydney.css"]
     self_contained: false # if true, fonts will be stored locally
     seal: true # show a title slide with YAML information
     nature:
-      beforeInit: ["assets/remark-zoom.js"]
       highlightStyle: github
       highlightLines: true
       countIncrementalSlides: false
@@ -181,9 +180,9 @@ The simplest and most frequently used methods are the .brand-red[filter] methods
 <!-- Import the prepared tab-separated text files of RNA-seq read counts and clinical data. -->
 
 ```{r, eval=TRUE, echo=FALSE}
-readCounts = read.delim("data/counts.txt", check.names = FALSE)
+readCounts = read.delim("../data/counts.txt", check.names = FALSE)
 readCounts = as.matrix(readCounts)
-sampleInfo = read.delim("data/samples.txt", check.names = FALSE)
+sampleInfo = read.delim("../data/samples.txt", check.names = FALSE)
 ```
 
 <!-- Reference Lab: Section 1.1 Reading data -->
@@ -205,7 +204,7 @@ nrow(sampleInfo)
 Observe the number of samples which are resistant to treatment and which are not.
 
 ```{r}
-table(sampleInfo[, "Response"], useNA="always")
+table(sampleInfo[, "Response"], useNA = "always")
 ```
 
 --
@@ -242,12 +241,12 @@ readsCPM = log2(1+cpm(readCounts))
 
 ```{r, echo = FALSE, include=FALSE}
 # match the matrices and remove the missing
-sampleInfoComplete = sampleInfo[!is.na(sampleInfo[,"Response"]),]
-readsCPM = readsCPM[,sampleInfoComplete[,"ID"]]
+sampleInfoComplete = sampleInfo[!is.na(sampleInfo[, "Response"]),]
+readsCPM = readsCPM[, rownames(sampleInfoComplete)]
 
 library(genefilter)
-Tstatistics = rowttests(readsCPM, sampleInfoComplete[,"Response"], tstatOnly = TRUE)
-head(Tstatistics[order(abs(Tstatistics[,"statistic"]), decreasing=TRUE),])
+Tstatistics = rowttests(readsCPM, sampleInfoComplete[, "Response"], tstatOnly = TRUE)
+head(Tstatistics[order(abs(Tstatistics[, "statistic"]), decreasing=TRUE), ])
 ```
 
 ---
@@ -261,14 +260,14 @@ head(Tstatistics[order(abs(Tstatistics[,"statistic"]), decreasing=TRUE),])
 trainingIndex = 1:ceiling(nrow(sampleInfoComplete)/2)
 testingIndex = max(trainingIndex+1):nrow(sampleInfoComplete)
 
-readsCPM_train = readsCPM[,trainingIndex]
-readsCPM_test = readsCPM[,testingIndex]
+readsCPM_train = readsCPM[, trainingIndex]
+readsCPM_test = readsCPM[, testingIndex]
 ```
 
 
 ```{r}
 dim(readsCPM_train)
-table(sampleInfoComplete[trainingIndex,"Response"])
+table(sampleInfoComplete[trainingIndex, "Response"])
 dim(readsCPM_test)
 ```
 
@@ -279,26 +278,24 @@ Diagonal Linear Discriminant Analysis (DLDA) is special version of LDA which ass
 
 ```{r, echo=FALSE}
 library(sparsediscrim)
-twoGenes = readsCPM[c("TMUB2","PHF8"),]
-twoGenes_train = readsCPM_train[c("TMUB2","PHF8"),]
-twoGenes_test = readsCPM_test[c("TMUB2","PHF8"),]
-trained_dlda = dlda(t(twoGenes), sampleInfoComplete[,"Response"])
+twoGenes = readsCPM[c("TMUB2", "PHF8"), ]
+twoGenes_train = readsCPM_train[c("TMUB2", "PHF8"), ]
+twoGenes_test = readsCPM_test[c("TMUB2", "PHF8"), ]
+trained_dlda = dlda(t(twoGenes), sampleInfoComplete[, "Response"])
 ```
 
 ```{r, echo = FALSE, fig.height = 6, fig.width = 6}
 library(scales)
-plot(t(twoGenes), type = "n",
-     xlim = c(4,7.5),
-     ylim = c(5,8))
-grid = expand.grid(seq(4,7.5,length.out = 100),
-                   seq(5,8,length.out = 100))
-gridClasses_dlda = apply(grid,1,function(x) predict(trained_dlda, x)[["class"]])
-points(grid[,1], grid[,2], col = alpha(as.numeric(gridClasses_dlda) + 2, 0.1),
+plot(t(twoGenes), type = "n", xlim = c(4, 7.5), ylim = c(5, 8))
+grid = expand.grid(seq(4, 7.5, length.out = 100),
+                   seq(5, 8, length.out = 100))
+gridClasses_dlda = apply(grid, 1, function(x) predict(trained_dlda, x)[["class"]])
+points(grid[, 1], grid[, 2], col = alpha(as.numeric(gridClasses_dlda) + 2, 0.1),
        cex = 1, pch = 15)
 points(t(twoGenes), 
      # pch = 16, 
-     col = as.numeric(sampleInfoComplete[,"Response"])+2,
-     pch = as.numeric(sampleInfoComplete[,"Response"])+15)
+     col = as.numeric(sampleInfoComplete[,"Response"]) + 2,
+     pch = as.numeric(sampleInfoComplete[,"Response"]) + 15)
 ```
 
 ---
@@ -308,11 +305,11 @@ DLDA from sparsediscrim for this case study has no tuning parameters to specify.
 
 ```{r, eval=TRUE}
 library(sparsediscrim)
-twoGenes_train = readsCPM_train[c("TMUB2","PHF8"),]
-trained_dlda = dlda(t(twoGenes_train), sampleInfoComplete[trainingIndex,"Response"])
+twoGenes_train = readsCPM_train[c("TMUB2", "PHF8"),]
+trained_dlda = dlda(t(twoGenes_train), sampleInfoComplete[trainingIndex, "Response"])
 
 predicted_dlda = predict(trained_dlda, t(twoGenes_test))[["class"]]
-table(sampleInfoComplete[testingIndex,"Response"], predicted_dlda)
+table(sampleInfoComplete[testingIndex, "Response"], predicted_dlda)
 ```
 
 - This is a confusion matrix showing the **known** response as well as what we predicted
@@ -336,12 +333,11 @@ library(randomForest)
 
 ```{r}
 trained_rf = randomForest(t(twoGenes_train), 
-                          sampleInfoComplete[trainingIndex,"Response"])
+                          sampleInfoComplete[trainingIndex, "Response"])
 
 predicted_rf = predict(trained_rf, t(twoGenes_test))
-table(sampleInfoComplete[testingIndex,"Response"], predicted_rf)
+table(sampleInfoComplete[testingIndex, "Response"], predicted_rf)
 ```
-
 
 ---
 ## Support Vector Machine: Non-Linear Boundary
@@ -352,10 +348,10 @@ The default kernel used is the radial basis function kernel which calculates a n
 
 ```{r}
 library(e1071)
-trained_svm = svm(t(twoGenes_train), sampleInfoComplete[trainingIndex,"Response"])
+trained_svm = svm(t(twoGenes_train), sampleInfoComplete[trainingIndex, "Response"])
 
 predicted_svm = predict(trained_svm, t(twoGenes_test))
-table(sampleInfoComplete[testingIndex,"Response"], predicted_svm)
+table(sampleInfoComplete[testingIndex, "Response"], predicted_svm)
 ```
 
 ---
@@ -366,8 +362,7 @@ table(sampleInfoComplete[testingIndex,"Response"], predicted_svm)
 - Different classifiers have different strengths and may be more suitable in different circumstances
 
 ```{r, echo = FALSE, fig.height = 5, fig.width = 14}
-
-par(mfrow=c(1,3))
+par(mfrow = c(1, 3))
 
 gridClasses_dlda = predict(trained_dlda, grid)[["class"]]
 gridClasses_rf = apply(grid,1,function(x) predict(trained_rf, x))
@@ -382,8 +377,8 @@ points(grid[,1], grid[,2],
        cex = 1, pch = 15)
 points(t(twoGenes), 
      # pch = 16, 
-     col = as.numeric(sampleInfoComplete[,"Response"])+2,
-     pch = as.numeric(sampleInfoComplete[,"Response"])+15)
+     col = as.numeric(sampleInfoComplete[, "Response"]) + 2,
+     pch = as.numeric(sampleInfoComplete[, "Response"]) + 15)
 
 plot(t(twoGenes), type = "n",
      xlim = c(4,7.5),
@@ -394,8 +389,8 @@ points(grid[,1], grid[,2],
        cex = 1, pch = 15)
 points(t(twoGenes), 
      # pch = 16, 
-     col = as.numeric(sampleInfoComplete[,"Response"])+2,
-     pch = as.numeric(sampleInfoComplete[,"Response"])+15)
+     col = as.numeric(sampleInfoComplete[,"Response"]) + 2,
+     pch = as.numeric(sampleInfoComplete[,"Response"]) + 15)
 
 
 plot(t(twoGenes), type = "n",
@@ -407,10 +402,9 @@ points(grid[,1], grid[,2],
        cex = 1, pch = 15)
 points(t(twoGenes), 
      # pch = 16, 
-     col = as.numeric(sampleInfoComplete[,"Response"])+2,
-     pch = as.numeric(sampleInfoComplete[,"Response"])+15)
+     col = as.numeric(sampleInfoComplete[, "Response"]) + 2,
+     pch = as.numeric(sampleInfoComplete[, "Response"]) + 15)
 ```
-
 
 ---
 
@@ -432,5 +426,3 @@ points(t(twoGenes),
   - Loading RNA-seq data set: Acute Myeloid Leukaemia treatment resistance
   - Cleaning and transformation
   - Fitting widely used classifiers to a simple partition of the data set
-
-

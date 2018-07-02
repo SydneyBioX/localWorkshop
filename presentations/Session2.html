@@ -6,8 +6,8 @@
     <meta name="author" content="Prof Jean Yang, Dr Dario Strbenac, Dr Ellis Patrick, Dr Shila Ghazanfar" />
     <meta name="date" content="2018-06-29" />
     <link href="Session2_files/remark-css-0.0.1/default.css" rel="stylesheet" />
-    <link rel="stylesheet" href="assets\sydney-fonts.css" type="text/css" />
-    <link rel="stylesheet" href="assets\sydney.css" type="text/css" />
+    <link rel="stylesheet" href="styling/sydney-fonts.css" type="text/css" />
+    <link rel="stylesheet" href="styling/sydney.css" type="text/css" />
   </head>
   <body>
     <textarea id="source">
@@ -22,7 +22,6 @@ class: center, middle, inverse, title-slide
 
 
 
-
 ## .brand-red[Roadmap]
 
 - .brand-red[Part 1: Introduction to statistical machine learning]
@@ -30,13 +29,11 @@ class: center, middle, inverse, title-slide
 
 - Afternoon tea: 30 minutes. 
 
-
 - .brand-red[Part 2: Performance assessment with cross-validation]
 
 - Understanding the ClassifyR package and using cross-validation to assess an existing classifier: 80 minutes. 
 
-- Final wrap up - overview of the latest methods on biologically guided machine learning approaches: 10 minutes. 
-
+- Final wrap-up - overview of the latest methods on biologically guided machine learning approaches: 10 minutes.
 
 ---
 ## Performance Assessment
@@ -86,13 +83,10 @@ background-position: 50% 50%
 
 
 ---
-
 class: middle, bottom
 background-image: url("SessionsImagesOnly/Slide32.png")
 background-size: contain
 background-position: 50% 50%
-
-
 
 ---
 class: middle, bottom
@@ -100,13 +94,11 @@ background-image: url("SessionsImagesOnly/Slide34.png")
 background-size: contain
 background-position: 50% 50%
 
-
 ---
 class: middle, bottom
 background-image: url("SessionsImagesOnly/Slide35.png")
 background-size: contain
 background-position: 50% 50%
-
 
 ---
 class: middle, bottom
@@ -114,15 +106,11 @@ background-image: url("SessionsImagesOnly/Slide36.png")
 background-size: contain
 background-position: 50% 50%
 
-
-
-
 ---
 
 ## Reproducible Cross-validation
 
-- A standardised form of cross-validation is not provided by a standard R installation. Often, researchers code their own cross-validation loop for each project, allowing opportunities for implementation inconsistencies to occur.  
-
+- A standardised form of cross-validation is not provided by a standard R installation. Often, researchers code their own cross-validation loop for each project, allowing opportunities for implementation inconsistencies to occur.
 
 - A few frameworks have been developed (e.g. MCRestimate, MLInterfaces, caret) but their focus is on classification, so evaluation of the features and predictions is not comprehensive.  
 
@@ -146,7 +134,7 @@ background-position: 50% 50%
 
 - Supports numeric-only (`matrix`) data, mixed numeric-categorical (`DataFrame`) data and multi-omics data (`MultiAssayExperiment`).
 
-- Continually maintained and supported (first released in 2014).  
+- Continually maintained and supported (first released in 2014).
 
 ---
 
@@ -160,7 +148,6 @@ background-position: 50% 50%
   - `TrainParams` This object is where you define your classifier eg. DLDA
   - `ClassifyResult` The object which will store the results from your CV performed by `runTests`.
 
-
 ---
 
 ## Running cross-validation with ClassifyR
@@ -168,7 +155,6 @@ background-position: 50% 50%
 - The default feature selection method of `SelectParams` is a moderated t-test based ranking and selection of the top `\(p\)` genes that give the best resubstitution error (considering 10, 20, ..., 100 top-ranked features). 
 
 - The default training and prediction methods for `TrainParams` are for Diagonal Linear Discriminant Analysis (DLDA). 
-
 - A 20 permutations and 5 folds cross-validation using default selection and classification methods is done using `runTests`.
 
 
@@ -178,7 +164,6 @@ classifiedDLDA &lt;- runTests(measurements = measurementsVS, classes = classes,
                            datasetName = "AML", classificationName = "DLDA",
                            permutations = 20, seed = 2018)
 ```
-
 
 ---
 
@@ -194,10 +179,7 @@ Confusion matrix
 | **Negative**     | True Negative (TN) | False Negative (FN) |
 | **Positive**     | False Positive (FP)      |   True Positive (TP) |
 
-
-
 - Accuracy = (TP + TN) / (TP + TN + FP + FN)
-
 
 
 ```r
@@ -212,13 +194,11 @@ performance(classifiedDLDA)["Accuracy"]
 ## [15] 0.6851064 0.7276596 0.7021277 0.6765957 0.6978723 0.6680851
 ```
 
-
 ---
 
 ## Error Rate
 
 - The proportion of samples which were assigned to the incorrect class by the classifier.  
-
 
 Confusion matrix
 
@@ -227,10 +207,7 @@ Confusion matrix
 | **Negative**     | True Negative (TN) | False Negative (FN) |
 | **Positive**     | False Positive (FP)      |   True Positive (TP) |
 
-
-
 - Error rate = (FP + FN) / (TP + TN + FP + FN) = 1 - Accuracy
-
 
 
 ```r
@@ -244,8 +221,6 @@ performance(classifiedDLDA)["Error Rate"]
 ##  [8] 0.3191489 0.3021277 0.3021277 0.3319149 0.3106383 0.2851064 0.3063830
 ## [15] 0.3148936 0.2723404 0.2978723 0.3234043 0.3021277 0.3319149
 ```
-
-
 
 ---
 
@@ -267,7 +242,6 @@ performance(classifiedDLDA)["Error Rate"]
 
   - Proportion of the Positives that are predicted correctly.
 
-
 ---
 
 ## SVM
@@ -278,10 +252,9 @@ Perform 5-fold cross-validation on a Support Vector Machines classifier
 ```r
 trainParams &lt;- TrainParams(SVMtrainInterface)
 predictParams &lt;- PredictParams(SVMpredictInterface,getClasses = function(result) result)
-classifiedSVM &lt;- runTests(measurementsVS, classes, "AML", "SVM",permutations = 20, 
+classifiedSVM &lt;- runTests(measurementsVS, classes, "AML", "SVM", permutations = 20, 
                           seed = 2018, params = list(trainParams, predictParams))
 ```
-
 
 ---
 
@@ -295,17 +268,14 @@ classifiedSVM &lt;- runTests(measurementsVS, classes, "AML", "SVM",permutations 
 classifiedSVM &lt;- calcCVperformance(classifiedSVM, "error")
 performancePlot(list(classifiedDLDA, classifiedSVM),
                 performanceName = "Error Rate", title = "Errors", yLimits = c(0,0.6),
-                plot=FALSE) + geom_hline(yintercept = 0.5, colour = "red")
+                plot = FALSE) + geom_hline(yintercept = 0.5, colour = "red")
 ```
 
 ![](Session2_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
 
-
-
 ---
 
 ## Sample-specific error rate
-
 
 The function `calcCVperformance` can be used to calculate sample-specific error rates for each patient.
 
@@ -332,12 +302,11 @@ DLDA is the only method which has a similar error profile in the minority and ma
 classifiedDLDA &lt;- calcCVperformance(classifiedDLDA, "balanced error")
 classifiedSVM &lt;- calcCVperformance(classifiedSVM, "balanced error")
 performancePlot(list(classifiedDLDA, classifiedSVM), performanceName = "Balanced Error Rate",
-                title = "Balanced Errors", yLimits = c(0,0.6), plot=FALSE) +
+                title = "Balanced Errors", yLimits = c(0, 0.6), plot = FALSE) +
                 geom_hline(yintercept = 0.5, colour = "red")
 ```
 
 ![](Session2_files/figure-html/unnamed-chunk-11-1.png)&lt;!-- --&gt;
-
 
 ---
 
@@ -356,8 +325,8 @@ withinChoices &lt;- selectionPlot(list(classifiedDLDA),
 
 &lt;img src="Session2_files/figure-html/unnamed-chunk-12-1.png" style="display: block; margin: auto;" /&gt;
 
-
 ---
+
 ## Performance assessment
 
 
@@ -370,10 +339,10 @@ withinChoices &lt;- selectionPlot(list(classifiedDLDA),
 - Feature selection stability.
 
 ---
+
 ## Now: Hands-on session
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
-<script src="assets/remark-zoom.js"></script>
 <script>var slideshow = remark.create({
 "highlightStyle": "github",
 "highlightLines": true,

@@ -6,8 +6,8 @@
     <meta name="author" content="Prof Jean Yang, Dr Dario Strbenac, Dr Ellis Patrick, Dr Shila Ghazanfar" />
     <meta name="date" content="2018-06-29" />
     <link href="Session1_files/remark-css-0.0.1/default.css" rel="stylesheet" />
-    <link rel="stylesheet" href="assets\sydney-fonts.css" type="text/css" />
-    <link rel="stylesheet" href="assets\sydney.css" type="text/css" />
+    <link rel="stylesheet" href="styling/sydney-fonts.css" type="text/css" />
+    <link rel="stylesheet" href="styling/sydney.css" type="text/css" />
   </head>
   <body>
     <textarea id="source">
@@ -49,6 +49,8 @@ class: center, middle, inverse, title-slide
   - Computer science: unsupervised and supervised learning.
   - Bioinformatics literature: class discovery and class prediction.
   - Statistics: Clustering and classification or discriminant analysis.
+  
+- In this workshop, we will focus on .brand-red[Supervised learning] and building classification models.
 
 ---
 
@@ -193,13 +195,13 @@ head(sampleInfo)
 ```
 
 ```
-##       ID Gender Age  Response Survival Time Status RUNX1-RUNX1T1 Fusion RUNX1 Mutation
-## 1 GEO-13   Male  70 Resistant           126   Dead                   No            Yes
-## 2 GEO-14   Male  61 Resistant           226   Dead                   No            Yes
-## 3 GEO-15 Female  61 Resistant           103   Dead                   No            Yes
-## 4 GEO-16   Male  60 Resistant           118   Dead                   No            Yes
-## 5 GEO-17   Male  56 Resistant           296   Dead                   No             No
-## 6 GEO-18   Male  25 Resistant           230  Alive                   No            Yes
+##        Gender Age  Response Survival Time Status RUNX1-RUNX1T1 Fusion RUNX1 Mutation
+## GEO-13   Male  70 Resistant           126   Dead                   No            Yes
+## GEO-14   Male  61 Resistant           226   Dead                   No            Yes
+## GEO-15 Female  61 Resistant           103   Dead                   No            Yes
+## GEO-16   Male  60 Resistant           118   Dead                   No            Yes
+## GEO-17   Male  56 Resistant           296   Dead                   No             No
+## GEO-18   Male  25 Resistant           230  Alive                   No            Yes
 ```
 
 ```r
@@ -217,7 +219,7 @@ Observe the number of samples which are resistant to treatment and which are not
 
 
 ```r
-table(sampleInfo[, "Response"], useNA="always")
+table(sampleInfo[, "Response"], useNA = "always")
 ```
 
 ```
@@ -293,7 +295,7 @@ dim(readsCPM_train)
 ```
 
 ```r
-table(sampleInfoComplete[trainingIndex,"Response"])
+table(sampleInfoComplete[trainingIndex, "Response"])
 ```
 
 ```
@@ -317,6 +319,11 @@ Diagonal Linear Discriminant Analysis (DLDA) is special version of LDA which ass
 
 
 
+
+```
+## Warning in as.character(col) %in% "0": NAs introduced by coercion
+```
+
 ![](Session1_files/figure-html/unnamed-chunk-12-1.png)&lt;!-- --&gt;
 
 ---
@@ -327,18 +334,18 @@ DLDA from sparsediscrim for this case study has no tuning parameters to specify.
 
 ```r
 library(sparsediscrim)
-twoGenes_train = readsCPM_train[c("TMUB2","PHF8"),]
-trained_dlda = dlda(t(twoGenes_train), sampleInfoComplete[trainingIndex,"Response"])
+twoGenes_train = readsCPM_train[c("TMUB2", "PHF8"),]
+trained_dlda = dlda(t(twoGenes_train), sampleInfoComplete[trainingIndex, "Response"])
 
 predicted_dlda = predict(trained_dlda, t(twoGenes_test))[["class"]]
-table(sampleInfoComplete[testingIndex,"Response"], predicted_dlda)
+table(sampleInfoComplete[testingIndex, "Response"], predicted_dlda)
 ```
 
 ```
 ##            predicted_dlda
 ##             Resistant Sensitive
-##   Resistant        21         6
-##   Sensitive        40        50
+##   Resistant        13        14
+##   Sensitive        46        44
 ```
 
 - This is a confusion matrix showing the **known** response as well as what we predicted
@@ -364,19 +371,18 @@ library(randomForest)
 
 ```r
 trained_rf = randomForest(t(twoGenes_train), 
-                          sampleInfoComplete[trainingIndex,"Response"])
+                          sampleInfoComplete[trainingIndex, "Response"])
 
 predicted_rf = predict(trained_rf, t(twoGenes_test))
-table(sampleInfoComplete[testingIndex,"Response"], predicted_rf)
+table(sampleInfoComplete[testingIndex, "Response"], predicted_rf)
 ```
 
 ```
 ##            predicted_rf
 ##             Resistant Sensitive
-##   Resistant        13        14
-##   Sensitive        25        65
+##   Resistant         7        20
+##   Sensitive        27        63
 ```
-
 
 ---
 ## Support Vector Machine: Non-Linear Boundary
@@ -388,17 +394,17 @@ The default kernel used is the radial basis function kernel which calculates a n
 
 ```r
 library(e1071)
-trained_svm = svm(t(twoGenes_train), sampleInfoComplete[trainingIndex,"Response"])
+trained_svm = svm(t(twoGenes_train), sampleInfoComplete[trainingIndex, "Response"])
 
 predicted_svm = predict(trained_svm, t(twoGenes_test))
-table(sampleInfoComplete[testingIndex,"Response"], predicted_svm)
+table(sampleInfoComplete[testingIndex, "Response"], predicted_svm)
 ```
 
 ```
 ##            predicted_svm
 ##             Resistant Sensitive
-##   Resistant         9        18
-##   Sensitive         3        87
+##   Resistant         3        24
+##   Sensitive        18        72
 ```
 
 ---
@@ -408,8 +414,13 @@ table(sampleInfoComplete[testingIndex,"Response"], predicted_svm)
 - This is only for two genes, things become more difficult to visualise in higher dimensions.
 - Different classifiers have different strengths and may be more suitable in different circumstances
 
-![](Session1_files/figure-html/unnamed-chunk-17-1.png)&lt;!-- --&gt;
 
+```
+## Warning in plot.xy(xy.coords(x, y), type = type, ...): semi-transparency is not supported
+## on this device: reported only once per page
+```
+
+![](Session1_files/figure-html/unnamed-chunk-17-1.png)&lt;!-- --&gt;
 
 ---
 
@@ -433,7 +444,6 @@ table(sampleInfoComplete[testingIndex,"Response"], predicted_svm)
   - Fitting widely used classifiers to a simple partition of the data set
     </textarea>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
-<script src="assets/remark-zoom.js"></script>
 <script>var slideshow = remark.create({
 "highlightStyle": "github",
 "highlightLines": true,

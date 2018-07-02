@@ -278,9 +278,10 @@ readCounts &lt;- as.matrix(readCounts)
 sampleInfo &lt;- read.delim(url(&quot;https://raw.githubusercontent.com/SydneyBioX/localWorkshop/master/data/samples.txt&quot;), check.names = FALSE)</code></pre>
 <p><code>check.names = FALSE</code> prevents R unnecessarily changing hyphens and spaces in column names to periods.</p>
 </div>
-<div id="extension-download-and-format-tables-from-geo" class="section level2">
-<h2><span class="header-section-number">3.1</span> Extension: Download and Format Tables From GEO</h2>
-<p>Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. GEO is quite standardised for microarray datasets but not so for RNA-Seq (due to multiple ways to dealing with the sequenced reads). As a result, there are very clean and standardised ways to load data from GEO into R for microarray data, however this is now not the case for RNA-Seq data. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.</p>
+<div id="reflection-download-and-format-tables-from-geo" class="section level2">
+<h2><span class="header-section-number">3.1</span> Reflection: Download and Format Tables From GEO</h2>
+<p>This exercise is observational; <strong>you don’t need to run the code or understand it</strong>.</p>
+<p>Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. GEO is well-standardised for microarray datasets but not so for RNA-Seq (due to multiple ways to dealing with the sequenced reads). As a result, there are very clean and standardised ways to load data from GEO into R for microarray data, however this is now not the case for RNA-Seq data. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.</p>
 <pre class="r"><code>library(GEOquery)
 library(tools)
 
@@ -538,7 +539,7 @@ X = as.data.frame(t(geneTrain[best10T,]))
 y = clinicalTrain$Response
 newX = as.data.frame(t(geneTest[best10T,]))
 
-SVMclassifierGene &lt;- svm(X,as.numeric(y))
+SVMclassifierGene &lt;- svm(X,y)
 SVMclassesGene &lt;- predict(SVMclassifierGene, newX)
 
 
@@ -546,97 +547,13 @@ SVMclassesGene &lt;- predict(SVMclassifierGene, newX)
 SVMconfusionGene &lt;- table(actual = classesTest, predicted = SVMclassesGene)
 SVMconfusionGene</code></pre>
 <pre><code>##            predicted
-## actual      0.919631535330085 0.939504284413783 0.955823960753045 1.01677217018817
-##   Resistant                 1                 0                 0                1
-##   Sensitive                 0                 1                 1                0
-##            predicted
-## actual      1.06233209550158 1.15389100399932 1.15411996631146 1.17822037486474
-##   Resistant                1                1                0                0
-##   Sensitive                0                0                1                1
-##            predicted
-## actual      1.17841718513501 1.19993145734082 1.22334461126291 1.26429706782748
-##   Resistant                0                0                1                1
-##   Sensitive                1                1                0                0
-##            predicted
-## actual      1.28710111667391 1.30348021326477 1.30694856830765 1.3252586762394
-##   Resistant                0                1                1               0
-##   Sensitive                1                0                0               1
-##            predicted
-## actual      1.35012047640327 1.38585209466098 1.40166917700294 1.40176738354261
-##   Resistant                0                1                1                1
-##   Sensitive                1                0                0                0
-##            predicted
-## actual      1.40735512297562 1.43076641947439 1.45542491534086 1.47940298629943
-##   Resistant                1                0                0                0
-##   Sensitive                0                1                1                1
-##            predicted
-## actual      1.49559291949868 1.52757577403532 1.53751813308453 1.55237145164386
-##   Resistant                0                0                0                0
-##   Sensitive                1                1                1                1
-##            predicted
-## actual      1.57466402010737 1.57865831507704 1.5884395928685 1.61647697559145
-##   Resistant                0                1               0                1
-##   Sensitive                1                0               1                0
-##            predicted
-## actual      1.65039512807043 1.7064155345486 1.71544944310525 1.73094637934323
-##   Resistant                0               0                0                0
-##   Sensitive                1               1                1                1
-##            predicted
-## actual      1.7367998098463 1.74324875535242 1.77705224522127 1.78045800418958
-##   Resistant               0                1                1                0
-##   Sensitive               1                0                0                1
-##            predicted
-## actual      1.78597128432106 1.80012513782655 1.80177269941536 1.80364243172378
-##   Resistant                0                0                0                0
-##   Sensitive                1                1                1                1
-##            predicted
-## actual      1.80789334292419 1.81138222893855 1.81450050491946 1.84989663925557
-##   Resistant                0                0                0                0
-##   Sensitive                1                1                1                1
-##            predicted
-## actual      1.85034940847571 1.85147751865513 1.88651945264223 1.89381172358256
-##   Resistant                0                1                0                0
-##   Sensitive                1                0                1                1
-##            predicted
-## actual      1.89532705985584 1.90427512892333 1.90544584913672 1.90991404651495
-##   Resistant                0                1                0                0
-##   Sensitive                1                0                1                1
-##            predicted
-## actual      1.91000243077427 1.91700086615778 1.91841155986879 1.92559919021745
-##   Resistant                0                0                0                0
-##   Sensitive                1                1                1                1
-##            predicted
-## actual      1.92568302587563 1.92747165574064 1.93974876918803 1.94715580919531
-##   Resistant                0                1                0                1
-##   Sensitive                1                0                1                0
-##            predicted
-## actual      1.95913686017399 1.96569168880931 1.96622413765817 1.96921793869099
-##   Resistant                0                0                0                1
-##   Sensitive                1                1                1                0
-##            predicted
-## actual      1.96945865055895 1.97043021810677 1.97467369164761 1.98885098143504
-##   Resistant                0                0                0                1
-##   Sensitive                1                1                1                0
-##            predicted
-## actual      1.99659037248611 2.00069612426074 2.00204139962641 2.00906839052162
-##   Resistant                0                0                0                0
-##   Sensitive                1                1                1                1
-##            predicted
-## actual      2.0184763072948 2.02851586967004 2.03251732349024 2.03417250383715
-##   Resistant               0                0                0                0
-##   Sensitive               1                1                1                1
-##            predicted
-## actual      2.04196906091637 2.04805566553774 2.05623401067887 2.0611146528537
-##   Resistant                0                0                0               0
-##   Sensitive                1                1                1               1
-##            predicted
-## actual      2.06603107194309 2.06842222575359
-##   Resistant                0                0
-##   Sensitive                1                1</code></pre>
+## actual      Resistant Sensitive
+##   Resistant        12        10
+##   Sensitive        15        49</code></pre>
 <pre class="r"><code># Calculate accuracy as the number of predictions the model got correct
 
 sum(diag(SVMconfusionGene))/sum(SVMconfusionGene)</code></pre>
-<pre><code>## [1] 0.02325581</code></pre>
+<pre><code>## [1] 0.7093023</code></pre>
 </div>
 <div id="random-forest-a-non-linear-boundary-classifier" class="section level2">
 <h2><span class="header-section-number">5.6</span> Random Forest: A Non-Linear Boundary Classifier</h2>
@@ -658,11 +575,11 @@ RFconfusionGene</code></pre>
 <pre><code>##            predicted
 ## actual      Resistant Sensitive
 ##   Resistant        12        10
-##   Sensitive        16        48</code></pre>
+##   Sensitive        17        47</code></pre>
 <pre class="r"><code># Calculate accuracy as the number of predictions the model got correct
 
 sum(diag(RFconfusionGene))/sum(RFconfusionGene)</code></pre>
-<pre><code>## [1] 0.6976744</code></pre>
+<pre><code>## [1] 0.6860465</code></pre>
 </div>
 <div id="naive-bayes-classifier" class="section level2">
 <h2><span class="header-section-number">5.7</span> naive Bayes classifier</h2>

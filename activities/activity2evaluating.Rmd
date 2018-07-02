@@ -44,37 +44,37 @@ Note: how do we make data reproducible when we are sampling ?
 
 ```{r sample}
 set.seed(1234)  # set seed for reproducibility
-X = matrix(1:36, nrow=4)
+X <- matrix(1:36, nrow = 4)
 ```
 
 (a) Randomly select 9 columns from the matrix $X$ without replacement
 
 ```{r sampleA}
-index = sample(1:9, 9, replace=FALSE)
-X[,index]
+index = sample(1:9, 9, replace = FALSE)
+X[, index]
 ```
 
 (b) Randomly select 9 columns from the matrix $X$ with replacement. What is the difference between this and part a) ?
 
 ```{r sampleB }
-index = sample(1:9, 9, replace=TRUE)
-X[,index]
+index <- sample(1:9, 9, replace = TRUE)
+X[, index]
 ```
 
 
 (c) Randomly select 5 columns from the matrix $X$ without replacement
 
 ```{r sampleC }
-index = sample(1:9, 5, replace=FALSE)
-X[,index]
+index <- sample(1:9, 5, replace = FALSE)
+X[, index]
 ```
 
 (d) Randomly select $2/3$ of the columns and use these to create a data matrix that you could use as a 'learning' set. Use the remaining samples to construct a data matrix that you could use as a 'test set'.
 
 ```{r sampleD}
-nL = 9 * (2/3) ## nL == number of sample in the Learning Set
-index = sample(1:9, nL, replace=FALSE)
-X[,index]
+nL <- 9 * (2/3) ## nL == number of sample in the Learning Set
+index <- sample(1:9, nL, replace = FALSE)
+X[, index]
 ```
 
 
@@ -109,10 +109,10 @@ for(i in 2:6)
 (c) Create a 5 x 6 matrix (of 5 rows and 6 columns). For each row and for each column, assign the value of an element in the matrix based on it's position: the product of the row number and column number.
 
 ```{r forcs }
-mymat <- matrix(nrow=5, ncol=6)
+mymat <- matrix(nrow = 5, ncol = 6)
 for(i in 1:nrow(mymat)) {
   for(j in 1:ncol(mymat)) {
-    mymat[i,j] = i*j
+    mymat[i, j] = i*j
   }
 }
 mymat
@@ -129,7 +129,7 @@ load("../data/activity1objects.RData")
 ```
 
 ```{r}
-geneData = t(measurementsVS)
+geneData <- t(measurementsVS)
 ```
 
 ## Training and test
@@ -140,15 +140,15 @@ Lets start by using the `sample` function to randomly split our data into a trai
 
 ```{r class}
 # How many samples are one quarter of our data?
-nTS = round(nrow(geneData) * 0.25)
-c(nTS,nrow(geneData))
+nTS <- round(nrow(geneData) * 0.25)
+c(nTS, nrow(geneData))
 
 # Create an index which select a random one quarter of the data to use as test set.
-TSindex = sample(1:nrow(geneData), nTS)
+TSindex <- sample(1:nrow(geneData), nTS)
 
 # Use this index vector to create a test set and training (Learning) set.
-LS = geneData[-TSindex, best10T]
-TS = geneData[TSindex, best10T]
+LS <- geneData[-TSindex, best10T]
+TS <- geneData[TSindex, best10T]
 
 # Construct a classifier with DLDA and use it on the test data.
 
@@ -160,10 +160,11 @@ DLDAclassifier <- dlda(LS, classes[-TSindex])
 # Use the classifier to predict classes of some new samples
 testResult <- predict(DLDAclassifier, TS)
 DLDAclasses <- testResult[["class"]]
-table(DLDAclasses, classes[TSindex])
+DLDAconfusion <- table(DLDAclasses, classes[TSindex])
+DLDAconfusion
 
 # Calculate accuracy as the number of predictions the model got correct
-sum(diag(DLDAconfusion))/sum(DLDAconfusion)
+sum(diag(DLDAconfusion)) / sum(DLDAconfusion)
 ```
 
 ## K-fold CV
@@ -174,9 +175,9 @@ Note: The coding exercise aims to provide foundational understanding for buildin
 
 ```{r kfoldCVA}
 # We can reorder our samples and split them into 5 folds as follows
-folds = rep(1:5, length.out = nrow(geneData))
-reorderdSamples = sample(1:nrow(geneData),nrow(geneData))
-foldlist = split(reorderdSamples, folds)
+folds <- rep(1:5, length.out = nrow(geneData))
+reorderdSamples <- sample(1:nrow(geneData), nrow(geneData))
+foldlist <- split(reorderdSamples, folds)
 ```
 
 **5-fold cross-validation**
@@ -184,11 +185,11 @@ foldlist = split(reorderdSamples, folds)
 We will now perform 5-fold cross-validation on our data. For simplicity of illustration we will *not* include feature selection in this process and will instead use the features `best10` that we selected outside of cross-validation. *It is very important* that you include feature selection in the cross-validation in practice.
 
 ```{r kfoldCVB}
-cvRes = cvTruth = c() ## create an empty vector to store results
+cvRes <- cvTruth <- c() ## create an empty vector to store results
 for (i in 1:5) {
-    TSindex = foldlist[[i]]
-    LS = geneData[-TSindex,best10T]
-    TS = geneData[TSindex,best10T]
+    TSindex <- foldlist[[i]]
+    LS <- geneData[-TSindex, best10T]
+    TS <- geneData[TSindex, best10T]
 
     # Build DLDA classifier
     DLDAclassifier <- dlda(LS, classes[-TSindex])
@@ -197,19 +198,19 @@ for (i in 1:5) {
     testResult <- predict(DLDAclassifier, TS)
     DLDAclasses <- testResult[["class"]]
     
-    cvRes[TSindex] = DLDAclasses
-    cvTruth[TSindex] = classes[TSindex]
+    cvRes[TSindex] <- DLDAclasses
+    cvTruth[TSindex] <- classes[TSindex]
 }
 cvRes
 cM = table(cvRes, cvTruth)  ## confusion matrix
 
 ## Overall accuracy
 val = sum(diag(cM)) / length(cvRes)
-round(val,2)
+round(val, 2)
 
 ## Balance error rate
-val = (cM[2,1] / colSums(cM)[1]) + (cM[1,2] / colSums(cM)[2])
-round(val,2)
+val = mean((cM[2, 1] / colSums(cM)[1]) + (cM[1, 2] / colSums(cM)[2]))
+round(val, 2)
 ```
 
 # ClassifyR Framework

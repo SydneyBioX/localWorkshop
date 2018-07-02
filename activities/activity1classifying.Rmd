@@ -18,7 +18,7 @@ editor_options:
 ```{r, echo = FALSE}
 library(knitr)
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
-knitr::opts_chunk$set(results = "show", fig.show = "show")
+knitr::opts_chunk$set(results = "hide", fig.show = "hide")
 options(width = 91)
 ```
 
@@ -73,9 +73,11 @@ sampleInfo <- read.delim(url("https://raw.githubusercontent.com/SydneyBioX/local
 
 `check.names = FALSE` prevents R unnecessarily changing hyphens and spaces in column names to periods.
 
-## Extension: Download and Format Tables From GEO
+## Reflection: Download and Format Tables From GEO
 
-Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. GEO is quite standardised for microarray datasets but not so for RNA-Seq (due to multiple ways to dealing with the sequenced reads). As a result, there are very clean and standardised ways to load data from GEO into R for microarray data, however this is now not the case for RNA-Seq data. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.
+This exercise is observational; **you don't need to run the code or understand it**.
+
+Unfortunately, standards and protocols for uploading gene expression data to repositories such as GEO have become very lax in recent years. GEO is well-standardised for microarray datasets but not so for RNA-Seq (due to multiple ways to dealing with the sequenced reads). As a result, there are very clean and standardised ways to load data from GEO into R for microarray data, however this is now not the case for RNA-Seq data. For completeness, below is the code that we used to download and load the AML data into R. Observe that the process is not streamlined, but do not run the code.
 
 ```{r, eval = FALSE}
 library(GEOquery)

@@ -262,12 +262,12 @@ div.tocify {
 <h2><span class="header-section-number">2.1</span> The function ‘sample’</h2>
 <p>Generate the matrix <span class="math inline">\(X\)</span> containing values 1 to 36 with 4 rows and 9 columns. Note: how do we make data reproducible when we are sampling ?</p>
 <pre class="r"><code>set.seed(1234)  # set seed for reproducibility
-X = matrix(1:36, nrow=4)</code></pre>
+X &lt;- matrix(1:36, nrow = 4)</code></pre>
 <ol style="list-style-type: lower-alpha">
 <li>Randomly select 9 columns from the matrix <span class="math inline">\(X\)</span> without replacement</li>
 </ol>
-<pre class="r"><code>index = sample(1:9, 9, replace=FALSE)
-X[,index]</code></pre>
+<pre class="r"><code>index = sample(1:9, 9, replace = FALSE)
+X[, index]</code></pre>
 <pre><code>##      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9]
 ## [1,]    5   17   29   13   25    9    1   21   33
 ## [2,]    6   18   30   14   26   10    2   22   34
@@ -276,8 +276,8 @@ X[,index]</code></pre>
 <ol start="2" style="list-style-type: lower-alpha">
 <li>Randomly select 9 columns from the matrix <span class="math inline">\(X\)</span> with replacement. What is the difference between this and part a) ?</li>
 </ol>
-<pre class="r"><code>index = sample(1:9, 9, replace=TRUE)
-X[,index]</code></pre>
+<pre class="r"><code>index &lt;- sample(1:9, 9, replace = TRUE)
+X[, index]</code></pre>
 <pre><code>##      [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9]
 ## [1,]   17   25   17    9   33    9   29    9    9
 ## [2,]   18   26   18   10   34   10   30   10   10
@@ -286,8 +286,8 @@ X[,index]</code></pre>
 <ol start="3" style="list-style-type: lower-alpha">
 <li>Randomly select 5 columns from the matrix <span class="math inline">\(X\)</span> without replacement</li>
 </ol>
-<pre class="r"><code>index = sample(1:9, 5, replace=FALSE)
-X[,index]</code></pre>
+<pre class="r"><code>index &lt;- sample(1:9, 5, replace = FALSE)
+X[, index]</code></pre>
 <pre><code>##      [,1] [,2] [,3] [,4] [,5]
 ## [1,]    5   33    9   29    1
 ## [2,]    6   34   10   30    2
@@ -296,9 +296,9 @@ X[,index]</code></pre>
 <ol start="4" style="list-style-type: lower-alpha">
 <li>Randomly select <span class="math inline">\(2/3\)</span> of the columns and use these to create a data matrix that you could use as a ‘learning’ set. Use the remaining samples to construct a data matrix that you could use as a ‘test set’.</li>
 </ol>
-<pre class="r"><code>nL = 9 * (2/3) ## nL == number of sample in the Learning Set
-index = sample(1:9, nL, replace=FALSE)
-X[,index]</code></pre>
+<pre class="r"><code>nL &lt;- 9 * (2/3) ## nL == number of sample in the Learning Set
+index &lt;- sample(1:9, nL, replace = FALSE)
+X[, index]</code></pre>
 <pre><code>##      [,1] [,2] [,3] [,4] [,5] [,6]
 ## [1,]    1    5   21   13   17   25
 ## [2,]    2    6   22   14   18   26
@@ -343,10 +343,10 @@ X[,index]</code></pre>
 <ol start="3" style="list-style-type: lower-alpha">
 <li>Create a 5 x 6 matrix (of 5 rows and 6 columns). For each row and for each column, assign the value of an element in the matrix based on it’s position: the product of the row number and column number.</li>
 </ol>
-<pre class="r"><code>mymat &lt;- matrix(nrow=5, ncol=6)
+<pre class="r"><code>mymat &lt;- matrix(nrow = 5, ncol = 6)
 for(i in 1:nrow(mymat)) {
   for(j in 1:ncol(mymat)) {
-    mymat[i,j] = i*j
+    mymat[i, j] = i*j
   }
 }
 mymat</code></pre>
@@ -363,22 +363,22 @@ mymat</code></pre>
 <div id="our-data" class="section level2">
 <h2><span class="header-section-number">3.1</span> Our data</h2>
 <p>We had three data objects; <code>measurementsVS</code> had a our gene expression data, <code>sampleInfo</code> had our clinical data and <code>classes</code> had our resistance information. Most classifiers want samples as rows and features as columns, so lets transpose the gene expression data and store it in <code>geneData</code>.</p>
-<pre class="r"><code>geneData = t(measurementsVS)</code></pre>
+<pre class="r"><code>geneData &lt;- t(measurementsVS)</code></pre>
 </div>
 <div id="training-and-test" class="section level2">
 <h2><span class="header-section-number">3.2</span> Training and test</h2>
 <p>As in the previous session, we will use the training set to build a classifier and the test set to test it.</p>
 <p>Lets start by using the <code>sample</code> function to randomly split our data into a training and test set. Randomly select <span class="math inline">\(25\%\)</span> of the samples as a test set and the remaining as learning set. Use the learning set to construct a classifier and then calculate the test-set error rate.</p>
 <pre class="r"><code># How many samples are one quarter of our data?
-nTS = round(nrow(geneData) * 0.25)
-c(nTS,nrow(geneData))</code></pre>
+nTS &lt;- round(nrow(geneData) * 0.25)
+c(nTS, nrow(geneData))</code></pre>
 <pre><code>## [1]  59 235</code></pre>
 <pre class="r"><code># Create an index which select a random one quarter of the data to use as test set.
-TSindex = sample(1:nrow(geneData), nTS)
+TSindex &lt;- sample(1:nrow(geneData), nTS)
 
 # Use this index vector to create a test set and training (Learning) set.
-LS = geneData[-TSindex, best10T]
-TS = geneData[TSindex, best10T]
+LS &lt;- geneData[-TSindex, best10T]
+TS &lt;- geneData[TSindex, best10T]
 
 # Construct a classifier with DLDA and use it on the test data.
 
@@ -390,14 +390,15 @@ DLDAclassifier &lt;- dlda(LS, classes[-TSindex])
 # Use the classifier to predict classes of some new samples
 testResult &lt;- predict(DLDAclassifier, TS)
 DLDAclasses &lt;- testResult[[&quot;class&quot;]]
-table(DLDAclasses, classes[TSindex])</code></pre>
+DLDAconfusion &lt;- table(DLDAclasses, classes[TSindex])
+DLDAconfusion</code></pre>
 <pre><code>##            
 ## DLDAclasses Resistant Sensitive
 ##   Resistant        12         6
 ##   Sensitive         4        37</code></pre>
 <pre class="r"><code># Calculate accuracy as the number of predictions the model got correct
-sum(diag(DLDAconfusion))/sum(DLDAconfusion)</code></pre>
-<pre><code>## [1] 0.744186</code></pre>
+sum(diag(DLDAconfusion)) / sum(DLDAconfusion)</code></pre>
+<pre><code>## [1] 0.8305085</code></pre>
 </div>
 <div id="k-fold-cv" class="section level2">
 <h2><span class="header-section-number">3.3</span> K-fold CV</h2>
@@ -406,16 +407,16 @@ sum(diag(DLDAconfusion))/sum(DLDAconfusion)</code></pre>
 </ul>
 <p>Note: The coding exercise aims to provide foundational understanding for building and performing CV. In particular, how to construct k-folds from scratch. I am presenting one option, can you find another? Hint: <a href="https://bioconductor.org/packages/release/bioc/vignettes/ClassifyR/inst/doc/ClassifyR.html#comparison-to-existing-classification-frameworks">Table 1</a> of the ClassifyR vignette is a comparison table of different frameworks.</p>
 <pre class="r"><code># We can reorder our samples and split them into 5 folds as follows
-folds = rep(1:5, length.out = nrow(geneData))
-reorderdSamples = sample(1:nrow(geneData),nrow(geneData))
-foldlist = split(reorderdSamples, folds)</code></pre>
+folds &lt;- rep(1:5, length.out = nrow(geneData))
+reorderdSamples &lt;- sample(1:nrow(geneData), nrow(geneData))
+foldlist &lt;- split(reorderdSamples, folds)</code></pre>
 <p><strong>5-fold cross-validation</strong></p>
 <p>We will now perform 5-fold cross-validation on our data. For simplicity of illustration we will <em>not</em> include feature selection in this process and will instead use the features <code>best10</code> that we selected outside of cross-validation. <em>It is very important</em> that you include feature selection in the cross-validation in practice.</p>
-<pre class="r"><code>cvRes = cvTruth = c() ## create an empty vector to store results
+<pre class="r"><code>cvRes &lt;- cvTruth &lt;- c() ## create an empty vector to store results
 for (i in 1:5) {
-    TSindex = foldlist[[i]]
-    LS = geneData[-TSindex,best10T]
-    TS = geneData[TSindex,best10T]
+    TSindex &lt;- foldlist[[i]]
+    LS &lt;- geneData[-TSindex, best10T]
+    TS &lt;- geneData[TSindex, best10T]
 
     # Build DLDA classifier
     DLDAclassifier &lt;- dlda(LS, classes[-TSindex])
@@ -424,8 +425,8 @@ for (i in 1:5) {
     testResult &lt;- predict(DLDAclassifier, TS)
     DLDAclasses &lt;- testResult[[&quot;class&quot;]]
     
-    cvRes[TSindex] = DLDAclasses
-    cvTruth[TSindex] = classes[TSindex]
+    cvRes[TSindex] &lt;- DLDAclasses
+    cvTruth[TSindex] &lt;- classes[TSindex]
 }
 cvRes</code></pre>
 <pre><code>##   [1] 1 1 1 1 1 1 1 1 2 1 1 2 1 1 1 1 1 1 1 2 2 2 1 1 2 1 1 2 1 1 2 2 2 1 2 2 2 1 1 2 2 2 2
@@ -438,13 +439,12 @@ cvRes</code></pre>
 
 ## Overall accuracy
 val = sum(diag(cM)) / length(cvRes)
-round(val,2)</code></pre>
+round(val, 2)</code></pre>
 <pre><code>## [1] 0.72</code></pre>
 <pre class="r"><code>## Balance error rate
-val = (cM[2,1] / colSums(cM)[1]) + (cM[1,2] / colSums(cM)[2])
-round(val,2)</code></pre>
-<pre><code>##    1 
-## 0.52</code></pre>
+val = mean((cM[2, 1] / colSums(cM)[1]) + (cM[1, 2] / colSums(cM)[2]))
+round(val, 2)</code></pre>
+<pre><code>## [1] 0.52</code></pre>
 </div>
 </div>
 <div id="classifyr-framework" class="section level1">
